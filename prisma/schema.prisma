@@ -1,15 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// PRISMA SCHEMA — Díaz Premium Envíos (SaaS-ready)
+// PRISMA SCHEMA — Dulce Encanto (MySQL para Railway/Hostinger)
 // ═══════════════════════════════════════════════════════════════════════════
-// MySQL — compatible con Hostinger y cualquier hosting con MySQL.
-// Todos los campos JSON (arrays, objetos) se guardan como String (TEXT).
+// MySQL — compatible con Railway y Hostinger.
+// Los campos JSON se guardan como @db.LongText para evitar límites de VARCHAR.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -39,8 +39,8 @@ model Product {
   sku       String   @default("")
   price     Float    @default(0)
   image     String   @default("")
-  images    String @default("[]")   // JSON string
-  tags      String @default("[]")   // JSON string
+  images    String @db.LongText @default("[]")
+  tags      String @db.LongText @default("[]")
   categoryId String  @default("")
   rating    Float    @default(0)
   reviewCount Int    @default(0)
@@ -226,8 +226,8 @@ model OrderItem {
   price     Float   @default(0)
   quantity  Int     @default(1)
   image     String  @default("")
-  variantInfo String @default("[]")  // JSON: [{groupName, optionName}]
-  extrasInfo  String @default("[]")  // JSON: [{name, price}]
+  variantInfo String @db.LongText @default("[]")
+  extrasInfo  String @db.LongText @default("[]")
 
   order Order @relation(fields: [orderId], references: [id])
 }
@@ -255,7 +255,7 @@ model Customer {
   address           String
   deliveryZoneId    String?
   deliveryZoneName  String?
-  savedRecipients   String @default("[]")  // JSON string
+  savedRecipients   String @db.LongText @default("[]")
   createdAt         String  @default("")
   updatedAt         String  @default("")
 }
@@ -268,9 +268,9 @@ model Review {
   customerId String?
   authorName String  @default("")
   rating     Int     @default(5)
-  comment    String
+  comment    String @db.LongText
   status     String  @default("pending")
-  adminReply String
+  adminReply String @db.LongText
   createdAt  String  @default("")
   updatedAt  String  @default("")
 }
@@ -306,7 +306,7 @@ model SiteConfig {
   cover                       String  @default("")
   heroTitle                   String  @default("")
   heroSubtitle                String  @default("")
-  heroSlides                  String  @default("")
+  heroSlides                  String @db.LongText @default("")
   promoBannerTitle            String  @default("")
   promoBannerSubtitle         String  @default("")
   promoBannerButtonText       String  @default("")
@@ -326,11 +326,11 @@ model SiteConfig {
   footerTextColor             String  @default("#d1d5db")
   footerAccentColor           String  @default("#f59e0b")
   themeId                     String  @default("diaz-premium")
-  themeData                   String
-  homeSectionsOrder           String
-  homeSectionsEnabled         String
-  offersCarousel              String
-  savedThemes                 String
+  themeData                   String @db.LongText
+  homeSectionsOrder           String @db.LongText
+  homeSectionsEnabled         String @db.LongText
+  offersCarousel              String @db.LongText
+  savedThemes                 String @db.LongText
   zelleEnabled                Boolean @default(true)
   freeShippingEnabled         Boolean @default(true)
   customerRegistrationEnabled Boolean @default(true)
@@ -357,18 +357,18 @@ model SiteConfig {
   asapExcludeNormalHours      Boolean @default(false)
   normalSchedule              String  @default("15:00 - 18:00")
   activeCountries             String  @default("US,CU")
-  tickerItems                 String
+  tickerItems                 String @db.LongText
   horarioSectionTitle         String  @default("")
   horarioSectionDesc          String
-  horarioCards                String
-  socialLinks                 String
-  trustBadges                 String
-  socialStats                 String
-  testimonials                String
-  homeBenefits                String
-  howItWorksSteps             String  @default("")
-  navSections                 String  @default("")
-  hamburgerItems              String  @default("")
+  horarioCards                String @db.LongText
+  socialLinks                 String @db.LongText
+  trustBadges                 String @db.LongText
+  socialStats                 String @db.LongText
+  testimonials                String @db.LongText
+  homeBenefits                String @db.LongText
+  howItWorksSteps             String @db.LongText @default("")
+  navSections                 String @db.LongText @default("")
+  hamburgerItems              String @db.LongText @default("")
   createdAt                   String  @default("")
   updatedAt                   String  @default("")
 }
@@ -404,7 +404,7 @@ model EventReservation {
   guestCount      Int     @default(0)
   budget          Float   @default(0)
   paymentMethod   String  @default("")
-  notes           String  @default("")
+  notes           String @db.LongText @default("")
   status          String  @default("pending")
   totalCup        Float   @default(0)
   totalUsd        Float   @default(0)

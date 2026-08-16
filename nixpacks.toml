@@ -3,6 +3,14 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Railway usa este archivo para construir y desplegar la app.
 #  Requiere MySQL database agregada en Railway (variable DATABASE_URL).
+#
+#  PASOS EN RAILWAY:
+#  1. Crear nuevo proyecto desde GitHub repo o subir el código
+#  2. Add > Database > Add MySQL
+#  3. Railway generará automáticamente DATABASE_URL (no necesitas setearla)
+#  4. Setear variable JWT_SECRET = (generar con: openssl rand -hex 32)
+#  5. Setear variable NODE_ENV = production
+#  6. Deploy
 # ═══════════════════════════════════════════════════════════════════════════
 
 [phases.setup]
@@ -15,24 +23,44 @@ cmds = [
 
 [phases.build]
 cmds = [
-  # Cambiar a schema MySQL para producción
-  'cp prisma/schema.mysql.prisma prisma/schema.prisma',
-  # Generar Prisma Client
+  # El schema.prisma ya es MySQL por defecto. Si necesitas SQLite
+  # para desarrollo local, usa: bash scripts/switch-schema.sh sqlite
+  #
+  # Generar Prisma Client para MySQL
   'bun run db:generate',
-  # Push schema a MySQL (crea tablas)
+  # Crear todas las tablas en MySQL (db:push es más simple que migrate
+  # para el primer deploy; no requiere historial de migraciones)
   'bun run db:push',
-  # Sembrar datos iniciales
+  # Sembrar datos iniciales (categorías, productos, config del sitio)
   'bun run scripts/seed-dulce.ts',
   'bun run scripts/seed-extras.ts',
   'bun run scripts/seed-catalog.ts',
-  # Build de producción
+  # Build de producción de Next.js
   'bun run build',
 ]
 
 [start]
 cmd = 'bun run start'
 
-# Variables de entorno requeridas en Railway:
-# - DATABASE_URL: mysql://... (provista por Railway MySQL addon)
-# - JWT_SECRET: generar con openssl rand -hex 32
-# - NODE_ENV: production
+# ═══════════════════════════════════════════════════════════════════════════
+#  VARIABLES DE ENTORNO REQUERIDAS EN RAILWAY:
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#  DATABASE_URL     → Generada automáticamente por Railway MySQL addon
+#                     (formato: mysql://user:pass@host:port/railway)
+#
+#  JWT_SECRET       → Generar con: openssl rand -hex 32
+#                     (necesario para firmar tokens de admin)
+#
+#  NODE_ENV         → production
+#
+#  DEFAULT_ADMIN_EMAIL    → (opcional) Email del superadmin. Default: desarrollablecuba@gmail.com
+#  DEFAULT_ADMIN_PASSWORD → (opcional) Password del superadmin. Default: Ma/*87.Sa
+#
+# ═══════════════════════════════════════════════════════════════════════════
+#  NOTAS:
+#  - El primer deploy tardará ~3-5 minutos (instala deps + build + seed)
+#  - Si el seed falla, puedes re-deployar (db:push es idempotente)
+#  - El admin login es: admin@dulceencanto.com / DulceAdmin2026!
+#    (después del seed; puedes cambiarlo desde el panel de admin)
+# ═══════════════════════════════════════════════════════════════════════════

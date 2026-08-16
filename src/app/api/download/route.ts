@@ -46,6 +46,7 @@ const INCLUDE_PATHS = [
   'public',
   'data',
   'scripts',
+  'README.md',
   'package.json',
   'tsconfig.json',
   'next.config.ts',
