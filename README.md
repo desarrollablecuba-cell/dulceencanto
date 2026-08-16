@@ -1,103 +1,110 @@
 # 🧁 Dulce Encanto — Repostería Artesanal
 
-Tienda online de repostería artesanal en Ciego de Ávila, Cuba. Vende tartas, pasteles, cupcakes, servicios para eventos y promociones.
+Tienda online de repostería artesanal en Ciego de Ávila, Cuba.
 
 ## 🚀 Despliegue en Railway con MySQL
 
-### 1. Crear proyecto en Railway
-1. Ve a [railway.app](https://railway.app) y crea una cuenta
-2. **New Project** > **Deploy from GitHub repo** (sube este código a GitHub primero)
-3. Selecciona el repositorio
+### Paso 1: Subir código a GitHub
+Sube todo el contenido del zip a un repositorio de GitHub.
 
-### 2. Agregar MySQL
-1. En el proyecto de Railway, click **+ Add**
-2. Selecciona **Database** > **Add MySQL**
-3. Railway creará automáticamente la variable `DATABASE_URL`
+### Paso 2: Crear proyecto en Railway
+1. Ve a [railway.app](https://railway.app) → **New Project**
+2. Selecciona **Deploy from GitHub repo**
+3. Elige tu repositorio
 
-### 3. Configurar variables de entorno
-En la pestaña **Variables** del servicio web, agrega:
+### Paso 3: Agregar MySQL (¡IMPORTANTE!)
+1. En el proyecto de Railway, click **+** (abajo a la derecha)
+2. Selecciona **Add Database** → **MySQL**
+3. Railway creará un servicio MySQL con estas variables automáticas:
+   - `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`
+   - **`MYSQL_URL`** o **`DATABASE_URL`** (URL de conexión completa)
 
-```
-JWT_SECRET=tu-secret-aqui-generado-con-openssl-rand-hex-32
-NODE_ENV=production
-```
+### Paso 4: Conectar DATABASE_URL al servicio Web (¡CRÍTICO!)
+1. Click en tu servicio **Web** (la app Next.js)
+2. Ve a la pestaña **Variables**
+3. Click **New Variable**
+4. Name: `DATABASE_URL`
+5. Value: click en el botón **"Reference Variable"** y selecciona `DATABASE_URL` del servicio MySQL
+   - O manualmente: `${{MySQL.DATABASE_URL}}`
+   - El formato será algo como: `mysql://root:pass@host:port/railway`
 
-> **Generar JWT_SECRET**: Ejecuta `openssl rand -hex 32` en tu terminal y copia el resultado.
+### Paso 5: Agregar variables adicionales
+En el mismo servicio Web → Variables:
 
-### 4. Deploy
-Railway detectará automáticamente el `nixpacks.toml` y:
-1. Instalará dependencias (`bun install`)
-2. Generará Prisma Client para MySQL
-3. Creará las tablas (`db:push`)
-4. Sembrará datos iniciales (categorías, productos, configuración)
-5. Compilará Next.js para producción
-6. Iniciará el servidor
+| Variable | Valor |
+|----------|-------|
+| `JWT_SECRET` | (genera con: `openssl rand -hex 32`) |
+| `NODE_ENV` | `production` |
 
-El primer deploy tarda **~3-5 minutos**.
+### Paso 6: Deploy
+Railway construirá automáticamente:
+1. `bun install` — instala dependencias
+2. `prisma generate` — genera el cliente de Prisma
+3. `prisma db push` — **crea todas las tablas en MySQL**
+4. Seeds — inserta productos, categorías y configuración inicial
+5. `next build` — compila la app para producción
+6. `node .next/standalone/server.js` — inicia el servidor
 
-### 5. Acceder al admin
-Una vez deployado, visita `https://tu-app.railway.app/admin`:
-- **Email**: `admin@dulceencanto.com`
-- **Password**: `DulceAdmin2026!`
+⏱️ El primer deploy tarda **~3-5 minutos**.
 
-> ⚠️ **Cambia estas credenciales** desde el panel de admin después del primer login.
+### Paso 7: Acceder al admin
+- URL: `https://tu-app.railway.app/admin`
+- Email: `admin@dulceencanto.com`
+- Password: `DulceAdmin2026!`
+
+> ⚠️ **Cambia estas credenciales** después del primer login.
+
+---
+
+## 🔧 Si la app no responde (troubleshooting)
+
+### La BD está vacía / no hay tablas
+**Problema:** `DATABASE_URL` no está conectada al servicio Web.
+**Solución:** Repite el Paso 4 anterior. Debes ver `DATABASE_URL` en las variables del servicio Web (no solo en el MySQL).
+
+### Error de conexión a MySQL
+**Problema:** El formato de `DATABASE_URL` es incorrecto.
+**Solución:** Debe ser: `mysql://user:password@host:port/database`
+
+### La app arranca pero se ve sin estilos/imagenes
+**Problema:** El build de standalone no copió los assets.
+**Solución:** Re-deploya. Si persiste, verifica que `public/` existe en el repo.
+
+---
 
 ## 🛠️ Desarrollo local (SQLite)
 
-Para desarrollo local con SQLite:
-
 ```bash
-# Cambiar a SQLite
+# Cambiar schema a SQLite
 bash scripts/switch-schema.sh sqlite
-
-# Configurar .env
 echo "DATABASE_URL=file:./db/custom.db" > .env
 
-# Instalar dependencias
+# Instalar + setup
 bun install
-
-# Crear BD y sembrar datos
+bun run db:generate
 bun run db:push
-bun run scripts/seed-dulce.ts
-bun run scripts/seed-extras.ts
-bun run scripts/seed-catalog.ts
+bun run db:seed-all
 
-# Iniciar dev server
+# Iniciar
 bun run dev
 ```
 
-## 📁 Estructura del proyecto
+## 📁 Estructura
 
 ```
-├── src/
-│   ├── app/              # Rutas de Next.js (App Router)
-│   ├── components/       # Componentes React
-│   │   ├── ecommerce/    # Componentes de la tienda
-│   │   └── ui/           # Componentes shadcn/ui
-│   ├── store/            # Zustand stores (cart, currency, wishlist)
-│   ├── lib/              # Utilidades (auth, db, themes)
-│   └── hooks/            # Custom hooks
-├── prisma/               # Schema de Prisma
-│   ├── schema.prisma     # Schema MySQL (default)
-│   ├── schema.sqlite.prisma # Schema SQLite (desarrollo local)
-│   └── schema.mysql.prisma  # Schema MySQL (backup)
-├── public/              # Imágenes y assets estáticos
-├── scripts/             # Scripts de seed y utilidades
-├── nixpacks.toml        # Config de Railway
-├── Caddyfile            # Config del gateway
+├── src/app/              # Rutas Next.js (App Router)
+├── src/components/       # Componentes React (ecommerce + ui)
+├── src/store/            # Zustand stores
+├── src/lib/              # Auth, DB, utils
+├── prisma/               # Schema Prisma (MySQL default)
+├── public/               # Imágenes (WebP)
+├── scripts/              # Seeds y utilidades
+├── nixpacks.toml         # Config Railway
 └── package.json
 ```
 
-## 🔧 Tecnologías
-
-- **Framework**: Next.js 16 (App Router, standalone output)
-- **Lenguaje**: TypeScript 5
-- **BD**: Prisma ORM (MySQL en producción, SQLite en desarrollo)
-- **UI**: Tailwind CSS 4 + shadcn/ui + Lucide icons
-- **Estado**: Zustand (cliente) + TanStack Query (servidor)
-- **Runtime**: Bun
-- **Auth**: JWT (admin) + NextAuth-ready (clientes)
-
-## 📞 Soporte
-
-Para problemas o preguntas, contacta al desarrollador.
+## 🔧 Stack
+- Next.js 16 + TypeScript 5 + Tailwind CSS 4 + shadcn/ui
+- Prisma ORM (MySQL producción / SQLite desarrollo)
+- Zustand + TanStack Query
+- Bun runtime

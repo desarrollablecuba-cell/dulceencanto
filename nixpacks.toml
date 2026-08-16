@@ -2,19 +2,19 @@
 #  NIXPACKS — Dulce Encanto (Railway deploy config)
 # ═══════════════════════════════════════════════════════════════════════════
 #  Railway usa este archivo para construir y desplegar la app.
-#  Requiere MySQL database agregada en Railway (variable DATABASE_URL).
 #
 #  PASOS EN RAILWAY:
-#  1. Crear nuevo proyecto desde GitHub repo o subir el código
-#  2. Add > Database > Add MySQL
-#  3. Railway generará automáticamente DATABASE_URL (no necesitas setearla)
-#  4. Setear variable JWT_SECRET = (generar con: openssl rand -hex 32)
-#  5. Setear variable NODE_ENV = production
+#  1. Sube el código a GitHub
+#  2. Railway: New Project > Deploy from GitHub repo
+#  3. Add > Database > MySQL (Railway genera DATABASE_URL automáticamente)
+#  4. En el servicio WEB, ve a Variables > Reference Variables
+#     y selecciona DATABASE_URL del MySQL service
+#  5. Agregar variables: JWT_SECRET y NODE_ENV=production
 #  6. Deploy
 # ═══════════════════════════════════════════════════════════════════════════
 
 [phases.setup]
-nixPkgs = ['bun', 'openssl']
+nixPkgs = ['bun', 'openssl', 'nodejs']
 
 [phases.install]
 cmds = [
@@ -23,44 +23,38 @@ cmds = [
 
 [phases.build]
 cmds = [
-  # El schema.prisma ya es MySQL por defecto. Si necesitas SQLite
-  # para desarrollo local, usa: bash scripts/switch-schema.sh sqlite
-  #
-  # Generar Prisma Client para MySQL
+  # Generar Prisma Client
   'bun run db:generate',
-  # Crear todas las tablas en MySQL (db:push es más simple que migrate
-  # para el primer deploy; no requiere historial de migraciones)
+  # Crear tablas en MySQL (usa DATABASE_URL de Railway)
   'bun run db:push',
-  # Sembrar datos iniciales (categorías, productos, config del sitio)
+  # Sembrar datos iniciales
   'bun run scripts/seed-dulce.ts',
   'bun run scripts/seed-extras.ts',
   'bun run scripts/seed-catalog.ts',
-  # Build de producción de Next.js
+  # Build de producción
   'bun run build',
 ]
 
 [start]
-cmd = 'bun run start'
+cmd = 'node .next/standalone/server.js'
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  VARIABLES DE ENTORNO REQUERIDAS EN RAILWAY:
 # ═══════════════════════════════════════════════════════════════════════════
 #
-#  DATABASE_URL     → Generada automáticamente por Railway MySQL addon
-#                     (formato: mysql://user:pass@host:port/railway)
+#  DATABASE_URL → Click en "Reference Variables" y selecciona la del MySQL addon
+#                 (formato: mysql://root:pass@host:port/railway)
 #
-#  JWT_SECRET       → Generar con: openssl rand -hex 32
-#                     (necesario para firmar tokens de admin)
+#  JWT_SECRET   → Generar con: openssl rand -hex 32
 #
-#  NODE_ENV         → production
+#  NODE_ENV     → production
 #
-#  DEFAULT_ADMIN_EMAIL    → (opcional) Email del superadmin. Default: desarrollablecuba@gmail.com
-#  DEFAULT_ADMIN_PASSWORD → (opcional) Password del superadmin. Default: Ma/*87.Sa
+#  ══════════════════════════════════════════════════════════════════════
+#  ⚠️ IMPORTANTE: Railway crea 2 servicios separados:
+#  1. MySQL (la base de datos)
+#  2. Web (la aplicación Next.js)
 #
-# ═══════════════════════════════════════════════════════════════════════════
-#  NOTAS:
-#  - El primer deploy tardará ~3-5 minutos (instala deps + build + seed)
-#  - Si el seed falla, puedes re-deployar (db:push es idempotente)
-#  - El admin login es: admin@dulceencanto.com / DulceAdmin2026!
-#    (después del seed; puedes cambiarlo desde el panel de admin)
-# ═══════════════════════════════════════════════════════════════════════════
+#  Debes "referenciar" las variables del MySQL en el servicio Web:
+#  Web service > Variables > New Variable > Name: DATABASE_URL
+#  > Value: ${MySQL.DATABASE_URL}  (click "Reference Variable")
+#  ══════════════════════════════════════════════════════════════════════
