@@ -1,0 +1,460 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// PRISMA SCHEMA — Díaz Premium Envíos (SaaS-ready)
+// ═══════════════════════════════════════════════════════════════════════════
+// MySQL — compatible con Hostinger y cualquier hosting con MySQL.
+// Todos los campos JSON (arrays, objetos) se guardan como String (TEXT).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── CATEGORÍAS ────────────────────────────────────────────────────────────
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  icon      String   @default("")
+  image     String   @default("")
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt String   @default("")
+  updatedAt String   @default("")
+
+  products  Product[]
+}
+
+// ─── PRODUCTOS ─────────────────────────────────────────────────────────────
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String
+  shortName String   @default("")
+  description String
+  sku       String   @default("")
+  price     Float    @default(0)
+  image     String   @default("")
+  images    String @default("[]")   // JSON string
+  tags      String @default("[]")   // JSON string
+  categoryId String  @default("")
+  rating    Float    @default(0)
+  reviewCount Int    @default(0)
+  stock     Int      @default(0)
+  featured  Boolean  @default(false)
+  order     Int      @default(0)
+
+  // Unidad y código
+  saleUnit      String  @default("unidad")
+  barcode       String  @default("")
+  productType   String  @default("elaborado")
+  status        String  @default("active")
+  posAvailable  Boolean @default(true)
+  tiendaAvailable Boolean @default(true)
+
+  // Anticipo
+  advanceType   String  @default("sin")
+  advanceValue  Float   @default(0)
+  minHours      Int     @default(24)
+  minHoursUnit  String  @default("horas")
+
+  // Costos
+  costPrice     Float   @default(0)
+  marginPercent Float   @default(0)
+
+  // Oferta
+  offerEnabled  Boolean @default(false)
+  offerType     String  @default("permanente")
+  offerPrice    Float   @default(0)
+  offerStart    String?
+  offerEnd      String?
+
+  // Por mayor
+  wholesaleEnabled Boolean @default(false)
+  wholesalePrice  Float   @default(0)
+  wholesaleMinQty Int     @default(0)
+
+  // Reserva
+  reservationEnabled  Boolean @default(false)
+  maxReservations     Int     @default(0)
+  reservationDays     Int     @default(0)
+  reservationDeposit  Float   @default(0)
+
+  // Promoción (legacy)
+  promoEnabled  Boolean @default(false)
+  promoType     String  @default("discount")
+  promoValue    Float   @default(0)
+  promoBuyQty   Int     @default(0)
+  promoGetQty   Int     @default(0)
+  promoStart    String?
+  promoEnd      String?
+
+  createdAt String @default("")
+  updatedAt String @default("")
+
+  category        Category        @relation(fields: [categoryId], references: [id])
+  wholesaleTiers  WholesaleTier[]
+  variantGroups   VariantGroup[]
+  combinations    ProductCombination[]
+  extras          ProductExtra[]
+}
+
+// ─── VENTA AL POR MAYOR ────────────────────────────────────────────────────
+
+model WholesaleTier {
+  id        String  @id @default(cuid())
+  productId String
+  name      String  @default("")
+  minQty    Int     @default(0)
+  maxQty    Int     @default(0)
+  price     Float   @default(0)
+  sortOrder Int     @default(0)
+  createdAt String  @default("")
+  updatedAt String  @default("")
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// ─── VARIANTES ─────────────────────────────────────────────────────────────
+
+model VariantGroup {
+  id          String  @id @default(cuid())
+  productId   String
+  name        String  @default("")
+  required    Boolean @default(false)
+  maxSelect   Int     @default(1)
+  isImageGroup Boolean @default(false)
+  isDominant  Boolean @default(false)
+  sortOrder   Int     @default(0)
+  createdAt   String  @default("")
+  updatedAt   String  @default("")
+
+  product Product        @relation(fields: [productId], references: [id])
+  options VariantOption[]
+}
+
+model VariantOption {
+  id        String  @id @default(cuid())
+  groupId   String
+  name      String  @default("")
+  priceMod  Float   @default(0)
+  image     String  @default("")
+  stock     Int     @default(0)
+  available Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt String  @default("")
+  updatedAt String  @default("")
+
+  group VariantGroup @relation(fields: [groupId], references: [id])
+}
+
+model ProductCombination {
+  id        String  @id @default(cuid())
+  productId String
+  optionIds String @default("[]")  // JSON string
+  sku       String  @default("")
+  stock     Int     @default(0)
+  price     Float?
+  image     String  @default("")
+  available Boolean @default(true)
+  sortOrder Int     @default(0)
+  createdAt String  @default("")
+  updatedAt String  @default("")
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model ProductExtra {
+  id          String  @id @default(cuid())
+  productId   String
+  name        String  @default("")
+  description String
+  priceMod    Float   @default(0)
+  required    Boolean @default(false)
+  sortOrder   Int     @default(0)
+  createdAt   String  @default("")
+  updatedAt   String  @default("")
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// ─── PEDIDOS ───────────────────────────────────────────────────────────────
+
+model Order {
+  id                String  @id @default(cuid())
+  orderNumber       String  @default("")
+  customerName      String  @default("")
+  customerEmail     String  @default("")
+  customerPhone     String  @default("")
+  address           String
+  city              String  @default("")
+  state             String  @default("")
+  zipCode           String  @default("")
+  recipientName     String  @default("")
+  recipientPhone    String  @default("")
+  recipientAddress  String
+  recipientCity     String  @default("")
+  recipientNotes    String
+  deliveryZoneId    String?
+  deliveryZoneName  String?
+  deliveryZonePrice Float   @default(0)
+  deliveryDate      String?
+  deliveryTimeSlot  String  @default("normal")
+  asapTimeSlot      String?
+  deliverySurcharge Float   @default(0)
+  shippingCost      Float   @default(0)
+  total             Float   @default(0)
+  status            String  @default("pending")
+  isPaid            Boolean @default(false)
+  zelleRef          String?
+  paymentProof      String?
+  createdAt         String  @default("")
+  updatedAt         String  @default("")
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String  @default("")
+  name      String  @default("")
+  price     Float   @default(0)
+  quantity  Int     @default(1)
+  image     String  @default("")
+  variantInfo String @default("[]")  // JSON: [{groupName, optionName}]
+  extrasInfo  String @default("[]")  // JSON: [{name, price}]
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+// ─── ADMIN ─────────────────────────────────────────────────────────────────
+
+model Admin {
+  id        String @id @default(cuid())
+  username  String @unique
+  password  String @default("")
+  name      String @default("")
+  createdAt String @default("")
+  updatedAt String @default("")
+}
+
+// ─── CLIENTES ──────────────────────────────────────────────────────────────
+
+model Customer {
+  id                String  @id @default(cuid())
+  name              String  @default("")
+  phone             String  @default("")
+  email             String  @unique
+  passwordHash      String  @default("")
+  country           String  @default("US")
+  address           String
+  deliveryZoneId    String?
+  deliveryZoneName  String?
+  savedRecipients   String @default("[]")  // JSON string
+  createdAt         String  @default("")
+  updatedAt         String  @default("")
+}
+
+// ─── RESEÑAS ───────────────────────────────────────────────────────────────
+
+model Review {
+  id         String  @id @default(cuid())
+  productId  String  @default("")
+  customerId String?
+  authorName String  @default("")
+  rating     Int     @default(5)
+  comment    String
+  status     String  @default("pending")
+  adminReply String
+  createdAt  String  @default("")
+  updatedAt  String  @default("")
+}
+
+// ─── ZONAS DE DELIVERY ─────────────────────────────────────────────────────
+
+model DeliveryZone {
+  id                     String  @id @default(cuid())
+  name                   String  @default("")
+  description            String
+  price                  Float   @default(0)
+  estimatedTime          String  @default("")
+  active                 Boolean @default(true)
+  order                  Int     @default(0)
+  allowsPriorityDelivery Boolean @default(false)
+  asapSurchargeOverride  Boolean @default(false)
+  asapSurchargeType      String  @default("fixed")
+  asapSurchargeValue     Float   @default(0)
+  asapMinLeadTimeOverride    Int?
+  asapMaxPerHourOverride     Int?
+  asapExcludeNormalHoursOverride Boolean @default(false)
+  createdAt              String  @default("")
+  updatedAt              String  @default("")
+}
+
+// ─── CONFIGURACIÓN DEL SITIO (fila única) ──────────────────────────────────
+
+model SiteConfig {
+  id                          String  @id @default(cuid())
+  storeName                   String  @default("Mi Tienda")
+  tagline                     String  @default("")
+  logo                        String  @default("")
+  cover                       String  @default("")
+  heroTitle                   String  @default("")
+  heroSubtitle                String  @default("")
+  heroSlides                  String  @default("")
+  promoBannerTitle            String  @default("")
+  promoBannerSubtitle         String  @default("")
+  promoBannerButtonText       String  @default("")
+  reservableDeliverySchedule  String  @default("")
+  priorityDeliveryInfo1       String  @default("")
+  priorityDeliveryInfo2       String  @default("")
+  priorityDeliveryInfo3       String  @default("")
+  phone                       String  @default("")
+  whatsappNumber              String  @default("")
+  address                     String
+  zelleEmail                  String  @default("")
+  zelleName                   String  @default("")
+  primaryColor                String  @default("#f59e0b")
+  primaryColorDark            String  @default("#d97706")
+  primaryColorLight           String  @default("#fef3c7")
+  footerBgColor               String  @default("#111827")
+  footerTextColor             String  @default("#d1d5db")
+  footerAccentColor           String  @default("#f59e0b")
+  themeId                     String  @default("diaz-premium")
+  themeData                   String
+  homeSectionsOrder           String
+  homeSectionsEnabled         String
+  offersCarousel              String
+  savedThemes                 String
+  zelleEnabled                Boolean @default(true)
+  freeShippingEnabled         Boolean @default(true)
+  customerRegistrationEnabled Boolean @default(true)
+  customerLoginEnabled        Boolean @default(true)
+  tickerEnabled               Boolean @default(true)
+  catalogLayout               String  @default("categories")
+  freeShippingMin             Float   @default(100)
+  shippingCost                Float   @default(9.99)
+  minOrderAmount              Float   @default(10)
+  scheduleLunes               String  @default("15:00 - 18:00")
+  scheduleMartes              String  @default("15:00 - 18:00")
+  scheduleMiercoles           String  @default("15:00 - 18:00")
+  scheduleJueves              String  @default("15:00 - 18:00")
+  scheduleViernes             String  @default("15:00 - 18:00")
+  scheduleSabado              String  @default("15:00 - 18:00")
+  scheduleDomingo             String  @default("15:00 - 18:00")
+  asapSurchargeType           String  @default("fixed")
+  asapSurchargeValue          Float   @default(5)
+  asapStartHour               String  @default("06:00")
+  asapEndHour                 String  @default("22:00")
+  maxOrderHour                String  @default("14:00")
+  asapMinLeadTime             Int     @default(60)
+  asapMaxPerHour              Int     @default(5)
+  asapExcludeNormalHours      Boolean @default(false)
+  normalSchedule              String  @default("15:00 - 18:00")
+  activeCountries             String  @default("US,CU")
+  tickerItems                 String
+  horarioSectionTitle         String  @default("")
+  horarioSectionDesc          String
+  horarioCards                String
+  socialLinks                 String
+  trustBadges                 String
+  socialStats                 String
+  testimonials                String
+  homeBenefits                String
+  howItWorksSteps             String  @default("")
+  navSections                 String  @default("")
+  hamburgerItems              String  @default("")
+  createdAt                   String  @default("")
+  updatedAt                   String  @default("")
+}
+
+// ─── SERVICIOS PARA EVENTOS ────────────────────────────────────────────────
+
+model Service {
+  id          String  @id @default(cuid())
+  name        String
+  description String
+  icon        String  @default("")
+  image       String  @default("")
+  price       Float   @default(0)
+  priceUsd    Float   @default(0)
+  category    String  @default("")
+  active      Boolean @default(true)
+  order       Int     @default(0)
+  createdAt   String  @default("")
+  updatedAt   String  @default("")
+}
+
+// ─── RESERVA DE EVENTOS ────────────────────────────────────────────────────
+
+model EventReservation {
+  id              String  @id @default(cuid())
+  reservationCode String  @default("")
+  eventType       String  @default("")
+  eventDate       String  @default("")
+  eventTime       String  @default("")
+  customerName    String  @default("")
+  customerEmail   String  @default("")
+  customerPhone   String  @default("")
+  guestCount      Int     @default(0)
+  budget          Float   @default(0)
+  paymentMethod   String  @default("")
+  notes           String  @default("")
+  status          String  @default("pending")
+  totalCup        Float   @default(0)
+  totalUsd        Float   @default(0)
+  createdAt       String  @default("")
+  updatedAt       String  @default("")
+
+  items EventReservationItem[]
+}
+
+model EventReservationItem {
+  id            String  @id @default(cuid())
+  reservationId String
+  itemType      String  @default("")
+  itemId        String  @default("")
+  name          String  @default("")
+  quantity      Int     @default(1)
+  priceCup      Float   @default(0)
+  priceUsd      Float   @default(0)
+  notes         String  @default("")
+
+  reservation EventReservation @relation(fields: [reservationId], references: [id])
+}
+
+// ─── PROMOCIONES POR FECHAS ────────────────────────────────────────────────
+
+model Promotion {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  image       String  @default("")
+  occasion    String  @default("")
+  discountPct Float   @default(0)
+  startDate   String  @default("")
+  endDate     String  @default("")
+  active      Boolean @default(true)
+  order       Int     @default(0)
+  createdAt   String  @default("")
+  updatedAt   String  @default("")
+}
+
+// ─── GALERÍA DE EVENTOS ────────────────────────────────────────────────────
+
+model GalleryItem {
+  id          String  @id @default(cuid())
+  title       String
+  image       String
+  eventType   String  @default("")
+  description String  @default("")
+  order       Int     @default(0)
+  active      Boolean @default(true)
+  createdAt   String  @default("")
+  updatedAt   String  @default("")
+}

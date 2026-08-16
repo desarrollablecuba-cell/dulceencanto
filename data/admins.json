@@ -1,0 +1,10 @@
+[
+  {
+    "id": "seed-admin-0",
+    "username": "desarrollablecuba@gmail.com",
+    "password": "$2b$10$wXv3jBQCzq4CPJeL.D0mNuQNWN7zltVwWgfG1EFMP.wZO.vz8Pw1S",
+    "name": "Super Administrador",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]

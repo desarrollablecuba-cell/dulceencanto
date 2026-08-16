@@ -1,0 +1,14 @@
+[
+  {
+    "productId": "seed-prod-1",
+    "customerId": "custmr47mmiztg3tlurl",
+    "authorName": "Tony Alonso",
+    "rating": 5,
+    "comment": "good",
+    "status": "approved",
+    "adminReply": "",
+    "id": "revmr4fkv0i5uyye5wh",
+    "createdAt": "2026-07-03T04:26:05.442Z",
+    "updatedAt": "2026-07-03T04:26:35.484Z"
+  }
+]

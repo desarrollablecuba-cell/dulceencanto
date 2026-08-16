@@ -1,0 +1,580 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Aumento de tamaño de fuente para mejor legibilidad (personas mayores)
+   ═══════════════════════════════════════════════════════════════════════
+   Se coloca al inicio para que las utilidades específicas con `!important`
+   ganen sobre las definiciones por defecto de Tailwind v4. Solo se aumenta
+   tamaño de fuente: no se toca spacing, padding ni posicionamiento.
+   ═══════════════════════════════════════════════════════════════════════ */
+html {
+  font-size: 17px; /* era 16px */
+}
+
+/* Aumentar tamaño de texto en elementos pequeños */
+body {
+  font-size: 1rem;
+}
+
+/* Texto pequeño más legible */
+.text-xs { font-size: 0.875rem !important; }
+.text-sm { font-size: 1rem !important; }
+
+/* Inputs más grandes para mejor usabilidad */
+input, select, textarea {
+  font-size: 1rem;
+}
+
+/* Botones más grandes */
+button {
+  font-size: 0.95rem;
+}
+
+/* ═══ Animación pulse-slow (carrito con productos) ═══
+   Pulso suave cada 2s para llamar la atención sin ser molesto. */
+@keyframes pulse-slow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* ═══ Animación marquee (cintillo de titulares) ═══
+   Scroll horizontal infinito. El contenido se duplica en el DOM,
+   por eso el keyframe termina en -50% (no -100%). */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ═══ Colores de marca configurables desde el admin ═══
+ *
+ * Tailwind v4 NO genera utilidades (bg-brand, text-brand, from-brand, etc.)
+ * para variables CSS dinámicas. Por eso definimos las utilidades
+ * manualmente aquí, referenciando las variables --brand-* que se inyectan
+ * en runtime desde BrandTheme.tsx.
+ *
+ * Default (cuando las variables no están inyectadas aún): amber/orange,
+ * que coincide con el branding original de Díaz Premium Envíos.
+ */
+
+@layer utilities {
+  /* Sólidos */
+  .bg-brand { background-color: var(--brand-primary, #f59e0b) !important; }
+  .bg-brand-dark { background-color: var(--brand-primary-dark, #d97706) !important; }
+  .bg-brand-light { background-color: var(--brand-primary-light, #fef3c7) !important; }
+  .text-brand { color: var(--brand-primary, #f59e0b) !important; }
+  .text-brand-dark { color: var(--brand-primary-dark, #d97706) !important; }
+  .text-brand-light { color: var(--brand-primary-light, #fef3c7) !important; }
+  .border-brand { border-color: var(--brand-primary, #f59e0b) !important; }
+  .border-brand-dark { border-color: var(--brand-primary-dark, #d97706) !important; }
+  .border-brand-light { border-color: var(--brand-primary-light, #fef3c7) !important; }
+  .ring-brand { --tw-ring-color: var(--brand-primary, #f59e0b) !important; }
+  .ring-brand-light { --tw-ring-color: var(--brand-primary-light, #fef3c7) !important; }
+  .fill-brand { fill: var(--brand-primary, #f59e0b) !important; }
+  .accent-brand { accent-color: var(--brand-primary, #f59e0b) !important; }
+
+  /* Opacidad (bg-brand/30, text-brand/50, etc.) — limitada a valores comunes */
+  .bg-brand\/25 { background-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 25%, transparent) !important; }
+  .bg-brand\/30 { background-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 30%, transparent) !important; }
+  .bg-brand\/40 { background-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 40%, transparent) !important; }
+  .bg-brand\/50 { background-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 50%, transparent) !important; }
+  .bg-brand-light\/40 { background-color: color-mix(in srgb, var(--brand-primary-light, #fef3c7) 40%, transparent) !important; }
+  .bg-brand-light\/50 { background-color: color-mix(in srgb, var(--brand-primary-light, #fef3c7) 50%, transparent) !important; }
+  .shadow-brand\/25 { --tw-shadow-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 25%, transparent) !important; }
+  .shadow-brand\/30 { --tw-shadow-color: color-mix(in srgb, var(--brand-primary, #f59e0b) 30%, transparent) !important; }
+
+  /* Hover variants */
+  .hover\:bg-brand:hover { background-color: var(--brand-primary, #f59e0b) !important; }
+  .hover\:bg-brand-dark:hover { background-color: var(--brand-primary-dark, #d97706) !important; }
+  .hover\:bg-brand-light:hover { background-color: var(--brand-primary-light, #fef3c7) !important; }
+  .hover\:text-brand:hover { color: var(--brand-primary, #f59e0b) !important; }
+  .hover\:text-brand-dark:hover { color: var(--brand-primary-dark, #d97706) !important; }
+  .hover\:border-brand:hover { border-color: var(--brand-primary, #f59e0b) !important; }
+  .hover\:border-brand-light:hover { border-color: var(--brand-primary-light, #fef3c7) !important; }
+  .hover\:bg-brand-light\/40:hover { background-color: color-mix(in srgb, var(--brand-primary-light, #fef3c7) 40%, transparent) !important; }
+  .hover\:bg-brand-light\/50:hover { background-color: color-mix(in srgb, var(--brand-primary-light, #fef3c7) 50%, transparent) !important; }
+
+  /* Gradientes — definidos como background-image directo para evitar la
+   * complejidad de las variables internas --tw-gradient-* de Tailwind v4
+   * que no siempre se resuelven correctamente con var() dinámico. */
+  .from-brand { background-image: linear-gradient(to right, var(--brand-primary, #f59e0b), transparent) !important; }
+  .from-brand-dark { background-image: linear-gradient(to right, var(--brand-primary-dark, #d97706), transparent) !important; }
+  .from-brand-light { background-image: linear-gradient(to right, var(--brand-primary-light, #fef3c7), transparent) !important; }
+  .to-brand { background-image: linear-gradient(to right, transparent, var(--brand-primary, #f59e0b)) !important; }
+  .to-brand-dark { background-image: linear-gradient(to right, transparent, var(--brand-primary-dark, #d97706)) !important; }
+  .to-brand-light { background-image: linear-gradient(to right, transparent, var(--brand-primary-light, #fef3c7)) !important; }
+
+  /* Gradiente completo from-X to-Y (caso más usado: botones, banners) */
+  .from-brand.to-brand { background-image: linear-gradient(to right, var(--brand-primary, #f59e0b), var(--brand-primary, #f59e0b)) !important; }
+  .from-brand.to-brand-dark { background-image: linear-gradient(to right, var(--brand-primary, #f59e0b), var(--brand-primary-dark, #d97706)) !important; }
+  .from-brand-dark.to-brand-dark { background-image: linear-gradient(to right, var(--brand-primary-dark, #d97706), var(--brand-primary-dark, #d97706)) !important; }
+  .from-brand-light.to-brand-light { background-image: linear-gradient(to right, var(--brand-primary-light, #fef3c7), var(--brand-primary-light, #fef3c7)) !important; }
+  .from-brand.to-brand-dark:hover { background-image: linear-gradient(to right, var(--brand-primary-dark, #d97706), var(--brand-primary-dark, #d97706)) !important; }
+
+  /* Footer colors */
+  .bg-footer-bg { background-color: var(--footer-bg, #111827) !important; }
+  .bg-footer-text { background-color: var(--footer-text, #d1d5db) !important; }
+  .text-footer-text { color: var(--footer-text, #d1d5db) !important; }
+  .text-footer-accent { color: var(--footer-accent, #f59e0b) !important; }
+  .border-footer-accent { border-color: var(--footer-accent, #f59e0b) !important; }
+  .hover\:text-footer-accent:hover { color: var(--footer-accent, #f59e0b) !important; }
+  .hover\:bg-footer-accent:hover { background-color: var(--footer-accent, #f59e0b) !important; }
+
+  /* ═══ Tokens de Design System ═══
+   * Tipografía, radios, sombras y estilos semánticos que consumen los
+   * tokens inyectados por applyTheme() (ver src/lib/themes.ts). */
+
+  /* Tipografía — aplica la familia y peso del tema */
+  .font-heading { font-family: var(--font-heading, 'Inter', system-ui, sans-serif) !important; font-weight: var(--weight-heading, 700) !important; }
+  .font-body { font-family: var(--font-body, 'Inter', system-ui, sans-serif) !important; font-weight: var(--weight-body, 400) !important; }
+
+  /* Radios semánticos */
+  .radius-button { border-radius: var(--radius-button, 8px) !important; }
+  .radius-card { border-radius: var(--radius-card, 8px) !important; }
+  .radius-input { border-radius: var(--radius-input, 8px) !important; }
+  .card-image-ratio { aspect-ratio: var(--card-image-ratio, 1 / 1) !important; }
+  .card-image-radius { border-radius: var(--card-image-radius, 0px) !important; overflow: hidden; }
+
+  /* Sombras semánticas */
+  .shadow-card { box-shadow: var(--shadow-card, none) !important; }
+  .shadow-hover { box-shadow: var(--shadow-hover, none) !important; }
+  .shadow-modal { box-shadow: var(--shadow-modal, none) !important; }
+  .hover\:shadow-hover:hover { box-shadow: var(--shadow-hover, none) !important; }
+  .hover\:shadow-card:hover { box-shadow: var(--shadow-card, none) !important; }
+
+  /* Colores semánticos de estado (success, warning, error, info) */
+  .bg-success { background-color: var(--brand-success, #10b981) !important; }
+  .bg-warning { background-color: var(--brand-warning, #f59e0b) !important; }
+  .bg-error { background-color: var(--brand-error, #ef4444) !important; }
+  .bg-info { background-color: var(--brand-info, #3b82f6) !important; }
+  .text-success { color: var(--brand-success, #10b981) !important; }
+  .text-warning { color: var(--brand-warning, #f59e0b) !important; }
+  .text-error { color: var(--brand-error, #ef4444) !important; }
+  .text-info { color: var(--brand-info, #3b82f6) !important; }
+  .border-success { border-color: var(--brand-success, #10b981) !important; }
+  .border-warning { border-color: var(--brand-warning, #f59e0b) !important; }
+  .border-error { border-color: var(--brand-error, #ef4444) !important; }
+  .border-info { border-color: var(--brand-info, #3b82f6) !important; }
+
+  /* Color secundario y de acento */
+  .bg-secondary { background-color: var(--brand-secondary, #6b7280) !important; }
+  .bg-accent { background-color: var(--brand-accent, #f59e0b) !important; }
+  .text-secondary { color: var(--brand-secondary, #6b7280) !important; }
+  .text-accent { color: var(--brand-accent, #f59e0b) !important; }
+  .border-secondary { border-color: var(--brand-secondary, #6b7280) !important; }
+  .border-accent { border-color: var(--brand-accent, #f59e0b) !important; }
+}
+
+/* ═══ Aplicación global de tipografía y base ═══
+ * Aplicamos la familia del tema a body y headings por defecto, para que
+ * TODA la tienda use la fuente configurada sin necesidad de añadir clases
+ * manualmente en cada componente.
+ */
+@layer base {
+  body {
+    font-family: var(--font-body, 'Inter', system-ui, -apple-system, sans-serif);
+    font-weight: var(--weight-body, 400);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading, 'Inter', system-ui, sans-serif);
+    font-weight: var(--weight-heading, 700);
+  }
+}
+
+/* Cursor pointer global — fuera de @layer base para tener mayor especificidad
+ * que las utilidades de Tailwind que no definen cursor. */
+button:not(:disabled),
+a,
+[role="button"],
+label[for],
+select,
+summary {
+  cursor: pointer !important;
+}
+button:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Object-fit para imágenes de cards — fuera de @layer para evitar purging */
+.card-image-fit { object-fit: var(--card-image-fit, cover) !important; }
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ==========================================================================
+   PRINT STYLES — para el ticket de pedido imprimible (OrderTicket.tsx)
+   ==========================================================================
+   Estrategia: el JS clona #printable-ticket al final del body antes de
+   imprimir. El CSS oculta todo con display:none y muestra solo el clon.
+   ========================================================================== */
+
+@page {
+  size: letter;
+  margin: 10mm;
+}
+
+@media print {
+  /* Ocultar TODO el body */
+  body > * {
+    display: none !important;
+  }
+
+  /* Mostrar SOLO el clon del ticket */
+  #printable-ticket-clone {
+    display: block !important;
+    position: static !important;
+  }
+
+  /* Mostrar SOLO el detalle del pedido (modo carta del OrderDetailModal) */
+  body.printing-order-detail #printable-order-detail-clone {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Reset del body */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Evitar cortes dentro de items */
+  #printable-ticket-clone * {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Forzar colores */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+.ticker-track {
+  animation: marquee 30s linear infinite;
+  will-change: transform;
+}
+
+/* Pausa la animación al hover (accesibilidad / lectura) */
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* Respeta prefers-reduced-motion (usuarios sensibles al movimiento) */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ANIMACIÓN: Agregar al carrito
+   Pulso verde + escala para feedback visual claro (personas mayores)
+   ═══════════════════════════════════════════════════════════════════════ */
+@keyframes addToCartPulse {
+  0% {
+    transform: scale(1);
+    background-color: var(--brand, #f59e0b);
+  }
+  30% {
+    transform: scale(1.15);
+    background-color: #22c55e;
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.3);
+  }
+  60% {
+    transform: scale(1.05);
+    background-color: #22c55e;
+  }
+  100% {
+    transform: scale(1);
+    background-color: var(--brand, #f59e0b);
+    box-shadow: none;
+  }
+}
+
+.add-to-cart-pulse {
+  animation: addToCartPulse 0.6s ease-out !important;
+  pointer-events: none;
+}
+
+/* Toast más grande y legible para personas mayores */
+[data-sonner-toast] {
+  font-size: 16px !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background: #f0fdf4 !important;
+  border: 2px solid #22c55e !important;
+  color: #15803d !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-title] {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHECKOUT FORM — Estilo visual mejorado (Task 4)
+   ═══════════════════════════════════════════════════════════════════════
+   Aplica solo a elementos dentro de `.checkout-enhanced` para no afectar
+   otros formularios del admin u otras páginas.
+
+   - Cards con borde 2px, sombra suave y hover
+   - Títulos de sección con borde inferior color brand
+   - Inputs con borde 2px y focus brand
+   - Labels con fondo sutil brand-light
+   ═══════════════════════════════════════════════════════════════════════ */
+.checkout-enhanced > [data-slot="card"] {
+  border: 2px solid #e5e7eb /* gray-200 */;
+  border-radius: 0.75rem /* rounded-xl */;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.checkout-enhanced > [data-slot="card"]:hover {
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.10);
+}
+.checkout-enhanced [data-slot="card-header"] {
+  border-bottom: 2px solid var(--brand-primary-light, #fef3c7) /* brand-light */;
+  padding-bottom: 0.5rem /* pb-2 */;
+  margin-bottom: 1rem /* mb-4 */;
+}
+.checkout-enhanced [data-slot="card-title"] {
+  color: var(--brand-primary-dark, #d97706) /* brand-dark */;
+  font-weight: 700;
+  font-size: 1.125rem /* text-lg */;
+}
+.checkout-enhanced [data-slot="card-title"] svg {
+  width: 1.5rem /* h-6 */;
+  height: 1.5rem;
+  color: var(--brand-primary, #f59e0b) /* brand */;
+}
+
+/* Inputs, textareas y selects con borde 2px y focus brand */
+.checkout-enhanced input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+.checkout-enhanced textarea,
+.checkout-enhanced select {
+  border-width: 2px !important;
+  border-color: #d1d5db /* gray-300 */ !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.checkout-enhanced input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus,
+.checkout-enhanced input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus-visible,
+.checkout-enhanced textarea:focus,
+.checkout-enhanced textarea:focus-visible,
+.checkout-enhanced select:focus,
+.checkout-enhanced select:focus-visible {
+  border-color: var(--brand-primary, #f59e0b) /* brand */ !important;
+  box-shadow: 0 0 0 2px var(--brand-primary-light, #fef3c7) /* ring-brand-light */ !important;
+  outline: none !important;
+}
+
+/* Labels de sección (text-base font-semibold) — fondo sutil */
+.checkout-enhanced .text-base.font-semibold {
+  display: inline-block;
+  background-color: color-mix(in srgb, var(--brand-primary-light, #fef3c7) 30%, transparent);
+  padding: 0.25rem 0.5rem /* px-2 py-1 */;
+  border-radius: 0.25rem /* rounded */;
+  color: #1f2937 /* gray-800 */;
+  font-weight: 600;
+}
+
+/* Asterisco rojo en campos requeridos (visibilidad para personas mayores) */
+.checkout-enhanced label.text-gray-700,
+.checkout-enhanced label.text-gray-800 {
+  color: #1f2937 /* gray-800 */;
+  font-weight: 600;
+}
+
+
+/* ═══ PWA + Mobile Responsiveness ════════════════════════════════════════ */
+
+/* Scrollbar horizontal elegante para tablas y contenedores anchos en móvil */
+.mobile-x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #A855F7 transparent;
+}
+.mobile-x-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.mobile-x-scroll::-webkit-scrollbar-track {
+  background: #F3E8FF;
+  border-radius: 3px;
+}
+.mobile-x-scroll::-webkit-scrollbar-thumb {
+  background: #A855F7;
+  border-radius: 3px;
+}
+.mobile-x-scroll::-webkit-scrollbar-thumb:hover {
+  background: #7E22CE;
+}
+
+/* Tablas del admin: scroll horizontal en móvil sin romper layout */
+.admin-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+.admin-table-wrap table {
+  min-width: 600px;
+}
+
+/* PWA: ocultar scrollbar en standalone mode */
+@media (display-mode: standalone) {
+  body {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Asegurar que el admin sidebar no se desborde en móvil */
+@media (max-width: 1023px) {
+  .admin-sidebar {
+    position: fixed;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* Inputs del admin: tamaño táctil mínimo en móvil */
+@media (max-width: 640px) {
+  input, select, textarea, button {
+    min-height: 40px;
+  }
+  .admin-table-wrap table {
+    font-size: 12px;
+  }
+}

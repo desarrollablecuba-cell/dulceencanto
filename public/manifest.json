@@ -1,0 +1,57 @@
+{
+  "name": "Dulce Encanto Admin",
+  "short_name": "DE Admin",
+  "description": "Panel de administración de Dulce Encanto — repostería artesanal y eventos",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2E1065",
+  "theme_color": "#A855F7",
+  "categories": ["business", "shopping", "food"],
+  "lang": "es-CU",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/admin",
+      "description": "Ver resumen del negocio"
+    },
+    {
+      "name": "Pedidos",
+      "url": "/admin#pedidos",
+      "description": "Gestionar pedidos"
+    },
+    {
+      "name": "Reservas",
+      "url": "/admin#reservas",
+      "description": "Calendario de reservas de eventos"
+    }
+  ]
+}

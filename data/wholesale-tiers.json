@@ -1,0 +1,24 @@
+[
+  {
+    "productId": "seed-prod-1",
+    "name": "Mini",
+    "minQty": 5,
+    "maxQty": 10,
+    "price": 5.5,
+    "sortOrder": 0,
+    "id": "wtmrdu6uplsp0f0o2g",
+    "createdAt": "2026-07-09T18:25:01.684Z",
+    "updatedAt": "2026-07-09T18:25:01.684Z"
+  },
+  {
+    "productId": "seed-prod-1",
+    "name": "Medio",
+    "minQty": 11,
+    "maxQty": 20,
+    "price": 5,
+    "sortOrder": 1,
+    "id": "wtmrdu6upmuoxjuups",
+    "createdAt": "2026-07-09T18:25:01.690Z",
+    "updatedAt": "2026-07-09T18:25:01.690Z"
+  }
+]

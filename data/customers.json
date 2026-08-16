@@ -1,0 +1,67 @@
+[
+  {
+    "phone": "+1 555 123 4567",
+    "passwordHash": "57f46edc654b65fb7f4a0af8c55bbf06218215b4d4f88aa7a6c630bfd04db937",
+    "savedRecipients": [
+      {
+        "id": "rcp-mr43lm2x-rk6y",
+        "label": "Mamá",
+        "name": "María García",
+        "phone": "+53 5555 1111",
+        "address": "Calle 1 Norte #45, Rpto. Latino",
+        "notes": "Casa con reja verde",
+        "deliveryZoneId": null,
+        "createdAt": "2026-07-02T22:50:45.129Z",
+        "updatedAt": "2026-07-02T22:50:45.129Z"
+      }
+    ],
+    "name": "Juan Pérez",
+    "email": "juan.perez@test.com",
+    "id": "custmr43j61kzt5tlvrw",
+    "createdAt": "2026-07-02T22:48:51.032Z",
+    "updatedAt": "2026-07-08T03:08:34.886Z",
+    "country": "US",
+    "address": "admin",
+    "deliveryZoneName": null
+  },
+  {
+    "phone": "+5350782825",
+    "passwordHash": "7050246506cfdf219ed5736a39017c6bcaab78a8f9c9027f6c0d144d910129f3",
+    "savedRecipients": [
+      {
+        "id": "rcp-mr47oqtn-ftfp",
+        "label": "Tía Juana",
+        "name": "Juana María Carrasco",
+        "phone": "+5356231245",
+        "address": "Calle 1 entre 2 y 4 Reparto Sueño",
+        "notes": "Frente a la farmacia",
+        "deliveryZoneId": "seed-zone-ciego-avila",
+        "createdAt": "2026-07-03T00:45:09.707Z",
+        "updatedAt": "2026-07-03T04:24:16.746Z"
+      }
+    ],
+    "name": "Tony Alonso",
+    "email": "dulcencantoyn@gmail.com",
+    "id": "custmr47mmiztg3tlurl",
+    "createdAt": "2026-07-03T00:43:30.827Z",
+    "updatedAt": "2026-07-08T05:29:39.475Z",
+    "country": "CU",
+    "address": "Bembeta % Martí y Narciso López #106",
+    "deliveryZoneId": "seed-zone-ciego-avila",
+    "deliveryZoneName": "Ciego de Ávila (Ciudad)"
+  },
+  {
+    "phone": "+53 5555 9999",
+    "passwordHash": "e2897d41bacfb2b9af0ef7440009035b15b07ac3ce78b30a041f729012f95a96",
+    "country": "US",
+    "address": "Calle Maceo #10, Rpto. Centro",
+    "deliveryZoneId": "seed-zone-ciego-avila",
+    "deliveryZoneName": "Ciego de Ávila (Ciudad)",
+    "savedRecipients": [],
+    "name": "Carlos Cubano Editado",
+    "email": "carlos.cubano@test.com",
+    "id": "custmr49ykd4q2ifv01k",
+    "createdAt": "2026-07-03T01:48:47.128Z",
+    "updatedAt": "2026-07-08T03:07:03.102Z"
+  }
+]

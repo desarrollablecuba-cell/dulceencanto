@@ -1,0 +1,542 @@
+[
+  {
+    "itemId": "7761",
+    "category": "suenos_sorpresa",
+    "name": "1. ✨ Dulzura en Pareja",
+    "description": "A veces, los gestos más significativos vienen en empaques...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/95d8a602-2df8-40dd-b9e7-524b54ea7eb0_large.webp",
+    "local_image": "/products/de/de-000-1----dulzura-en-pareja.webp"
+  },
+  {
+    "itemId": "7760",
+    "category": "suenos_sorpresa",
+    "name": "2. 🌸 Trilogía de Encanto",
+    "description": "Nuestra Trilogía de Encanto es la máxima expresión de...",
+    "price": 50000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/596b2dd3-aa9c-4a05-82f6-2277c298c58f_large.webp",
+    "local_image": "/products/de/de-001-2----trilog-a-de-encanto.webp"
+  },
+  {
+    "itemId": "7737",
+    "category": "suenos_sorpresa",
+    "name": "3. 🌟 La Gran Gala de la Ilusión",
+    "description": "¿Por qué elegir una sola sorpresa cuando puedes tenerlas...",
+    "price": 65000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/cd224af5-229c-4598-9586-75ee4eb3ad8a_large.webp",
+    "local_image": "/products/de/de-002-3----la-gran-gala-de-la-ilusi-.webp"
+  },
+  {
+    "itemId": "7742",
+    "category": "suenos_sorpresa",
+    "name": "4. 👑El Banquete de los Deseos",
+    "description": "Esta es nuestra oferta de lujo, una experiencia inmersiva...",
+    "price": 80000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/b757fed7-157d-4748-a56d-fd00f40a7618_large.webp",
+    "local_image": "/products/de/de-003-4---el-banquete-de-los-deseos.webp"
+  },
+  {
+    "itemId": "7769",
+    "category": "dulces_finos_buffet",
+    "name": "1. 🥟Panzerottis",
+    "description": "Disfruta de nuestra irresistible empanada estilo...",
+    "price": 700.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4dc23a66-d02a-44d9-82b8-d4ee3b5d314d_large.webp",
+    "local_image": "/products/de/de-004-1---panzerottis.webp"
+  },
+  {
+    "itemId": "7685",
+    "category": "dulces_finos_buffet",
+    "name": "2. Empanadillas",
+    "description": "Delicia individual de masa hojaldrada y dorada, con borde...",
+    "price": 40.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/b356f24f-a612-434b-b564-1776044a5873_large.webp",
+    "local_image": "/products/de/de-005-2--empanadillas.webp"
+  },
+  {
+    "itemId": "7723",
+    "category": "dulces_finos_buffet",
+    "name": "3. Tortica",
+    "description": "Delicioso dulce de textura quebradiza, elaborada con harina...",
+    "price": 40.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/b7ccadf5-1e32-4fbb-a172-05c5b6ef99dd_large.webp",
+    "local_image": "/products/de/de-006-3--tortica.webp"
+  },
+  {
+    "itemId": "7687",
+    "category": "dulces_finos_buffet",
+    "name": "4. Croqueta de Pollo",
+    "description": "Delicioso bocadillo de pollo con un empanizado dorado y...",
+    "price": 40.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/1dbea5f4-46fc-4511-8ddc-67a72fbd3ff1_large.webp",
+    "local_image": "/products/de/de-007-4--croqueta-de-pollo.webp"
+  },
+  {
+    "itemId": "7700",
+    "category": "dulces_finos_buffet",
+    "name": "5. Galleticas de Mantequilla",
+    "description": "Nuestra galleta artesanal de mantequilla, horneada hasta...",
+    "price": 45.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/670fd363-e1a3-43b7-be42-f22021d2dddc_large.webp",
+    "local_image": "/products/de/de-008-5--galleticas-de-mantequilla.webp"
+  },
+  {
+    "itemId": "7686",
+    "category": "dulces_finos_buffet",
+    "name": "6. Pan con Pasta",
+    "description": "Sencillo y delicioso bocado de pan blanco tipo brioche,...",
+    "price": 45.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/024632f0-c932-4a69-9929-8b17f20cc191_large.webp",
+    "local_image": "/products/de/de-009-6--pan-con-pasta.webp"
+  },
+  {
+    "itemId": "7733",
+    "category": "dulces_finos_buffet",
+    "name": "7. Babka de Chocolate",
+    "description": "Déjate atrapar por este pan dulce artesanal de masa suave...",
+    "price": 200.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/c96ec839-6edb-473e-bf4c-477fc6a57945_large.webp",
+    "local_image": "/products/de/de-010-7--babka-de-chocolate.webp"
+  },
+  {
+    "itemId": "7698",
+    "category": "dulces_finos_buffet",
+    "name": "8. Palitos con Cobertura de Chocolate",
+    "description": "Delicados palitos de galleta con una textura suave y...",
+    "price": 100.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/07b38646-cd28-41e8-ac63-0b464a7cb584_large.webp",
+    "local_image": "/products/de/de-011-8--palitos-con-cobertura-de-ch.webp"
+  },
+  {
+    "itemId": "7699",
+    "category": "dulces_finos_buffet",
+    "name": "9. Mini Donas",
+    "description": "Nuestra esponjosa mini dona artesanal está bañada en una...",
+    "price": 120.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/ea8a175f-64dc-4192-b2f3-f645c888ed99_large.webp",
+    "local_image": "/products/de/de-012-9--mini-donas.webp"
+  },
+  {
+    "itemId": "7688",
+    "category": "dulces_finos_buffet",
+    "name": "10. Rollito",
+    "description": "Delicioso pan enrollado de textura suave y esponjosa, con...",
+    "price": 180.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/3581ee81-7347-4da7-9272-2964a44d4757_large.webp",
+    "local_image": "/products/de/de-013-10--rollito.webp"
+  },
+  {
+    "itemId": "7735",
+    "category": "dulces_finos_buffet",
+    "name": "11. Berlinesa Rellena con Dulce Leche",
+    "description": "Disfruta de una masa artesanal extra suave y esponjosa,...",
+    "price": 180.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/502cd30f-986f-47cd-bb7a-359f541573a3_large.webp",
+    "local_image": "/products/de/de-014-11--berlinesa-rellena-con-dulc.webp"
+  },
+  {
+    "itemId": "7701",
+    "category": "dulces_finos_buffet",
+    "name": "12. Bomba de Chocolate y Almendra Laminada",
+    "description": "Una explosión de suavidad: masa tierna y esponjosa bañada...",
+    "price": 180.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/084e3c99-7b54-4dd9-8451-095142427f0a_large.webp",
+    "local_image": "/products/de/de-015-12--bomba-de-chocolate-y-almen.webp"
+  },
+  {
+    "itemId": "7724",
+    "category": "dulces_finos_buffet",
+    "name": "13. Mini Flan",
+    "description": "Delicado dulce fino de textura suave y cremosa, elaborado...",
+    "price": 200.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/ac54468b-7c4d-4d14-be7a-ece074b7f51d_large.webp",
+    "local_image": "/products/de/de-016-13--mini-flan.webp"
+  },
+  {
+    "itemId": "7722",
+    "category": "dulces_finos_buffet",
+    "name": "14. Tartaleta de Clocolate",
+    "description": "Sofisticada tartaleta de masa quebrada rellena con una...",
+    "price": 200.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/eebbbf0e-f844-4ab9-9ef1-c27cfefd184a_large.webp",
+    "local_image": "/products/de/de-017-14--tartaleta-de-clocolate.webp"
+  },
+  {
+    "itemId": "7683",
+    "category": "dulces_finos_buffet",
+    "name": "15. Cupcake Bicolor",
+    "description": "Delicioso cupcake de vainilla decorado con un remolino de...",
+    "price": 200.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/dfb43fbd-893a-4e44-ac41-b86d45182a19_large.webp",
+    "local_image": "/products/de/de-018-15--cupcake-bicolor.webp"
+  },
+  {
+    "itemId": "7697",
+    "category": "dulces_finos_buffet",
+    "name": "16. Tequeños",
+    "description": "Disfruta de una masa dorada y súper crujiente que envuelve...",
+    "price": 200.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/0c92ce86-4bbf-4c85-964f-be0aed325bf7_large.webp",
+    "local_image": "/products/de/de-019-16--teque-os.webp"
+  },
+  {
+    "itemId": "7696",
+    "category": "dulces_finos_buffet",
+    "name": "17. Brownie",
+    "description": "Déjate seducir por un bizcocho de chocolate húmedo y...",
+    "price": 250.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/65b74ca6-338b-4b97-b08f-c079457c97ca_large.webp",
+    "local_image": "/products/de/de-020-17--brownie.webp"
+  },
+  {
+    "itemId": "7682",
+    "category": "dulces_finos_buffet",
+    "name": "18. Chocoflan Dulce Imposible",
+    "description": "Deliciosa combinación de suave flan sobre una base de...",
+    "price": 250.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/79b3b7f8-9da4-475c-96dd-1a9e4cbb2bb4_large.webp",
+    "local_image": "/products/de/de-021-18--chocoflan-dulce-imposible.webp"
+  },
+  {
+    "itemId": "7684",
+    "category": "dulces_finos_buffet",
+    "name": "19. Marquesita de Chocolate",
+    "description": "Delicioso bizcocho cuadrado de chocolate con textura suave,...",
+    "price": 250.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/5e88be2d-7811-44c0-99a7-5b0850457701_large.webp",
+    "local_image": "/products/de/de-022-19--marquesita-de-chocolate.webp"
+  },
+  {
+    "itemId": "7721",
+    "category": "dulces_finos_buffet",
+    "name": "20. Tartaleta Clásica con Ensalada Fría",
+    "description": "Deliciosa tartaleta de masa crujiente rellena con una...",
+    "price": 250.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/c427a4a4-bdd1-4a2b-92f1-70a1fad833f1_large.webp",
+    "local_image": "/products/de/de-023-20--tartaleta-cl-sica-con-ensa.webp"
+  },
+  {
+    "itemId": "7732",
+    "category": "dulces_finos_buffet",
+    "name": "21. Paleta de Masa de Panetela con Cobertura de Chocolate",
+    "description": "Muerde el Sabor.\nDéjate conquistar por un corazón suave...",
+    "price": 500.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/9f43bdbd-f361-4c02-a6dd-0534adb09396_large.webp",
+    "local_image": "/products/de/de-024-21--paleta-de-masa-de-panetela.webp"
+  },
+  {
+    "itemId": "7734",
+    "category": "dulces_finos_buffet",
+    "name": "22. Vasos de Tres Leches",
+    "description": "Capas infinitas de bizcocho artesanal profundamente...",
+    "price": 1000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/f1754aaf-fba1-4817-a06e-e7ae07db28d2_large.webp",
+    "local_image": "/products/de/de-025-22--vasos-de-tres-leches.webp"
+  },
+  {
+    "itemId": "7848",
+    "category": "dulces_finos_buffet",
+    "name": "23. 🎂🧀Cheesecakes de Queso",
+    "description": "Disfruta del equilibrio perfecto entre cremosidad y...",
+    "price": 600.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/c00784e9-7212-4e6c-bd75-6ac756a8c3fe_large.webp",
+    "local_image": "/products/de/de-026-23----cheesecakes-de-queso.webp"
+  },
+  {
+    "itemId": "7731",
+    "category": "dulces_finos_buffet",
+    "name": "24. 🍰 Vasos Surtidos Dulce Tentación",
+    "description": "Un festín de texturas en 9 onzas: suave panetela artesanal...",
+    "price": 1100.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4cea285a-b582-4f03-9726-0fb4cc0badc7_large.webp",
+    "local_image": "/products/de/de-027-24----vasos-surtidos-dulce-ten.webp"
+  },
+  {
+    "itemId": "7689",
+    "category": "dulces_finos_buffet",
+    "name": "25. Pizza Familiar Tamaño Bandeja de Queso Blanco y Jamón",
+    "description": "Preparada directamente en bandeja rectangular, lo que...",
+    "price": 3000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/16d994df-1ee5-498a-9339-a527e2193b96_large.webp",
+    "local_image": "/products/de/de-028-25--pizza-familiar-tama-o-band.webp"
+  },
+  {
+    "itemId": "7681",
+    "category": "dulces_finos_buffet",
+    "name": "26. Brazo Gitano de Chocolate y Adorno Cereza",
+    "description": "Tradicional bizcocho enrollado relleno y cubierto con una...",
+    "price": 7000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/6a0a62ec-e086-4ebc-a015-db4d9ceee54e_large.webp",
+    "local_image": "/products/de/de-029-26--brazo-gitano-de-chocolate-.webp"
+  },
+  {
+    "itemId": "7690",
+    "category": "dulces_finos_buffet",
+    "name": "27. Ensalada Fría Tanqueta de 6 litros",
+    "description": "Elaborada con coditos o espaguetis, jamón, piña, maíz y...",
+    "price": 10000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4f97f66d-93ba-4dc1-8550-b42578a936ef_large.webp",
+    "local_image": "/products/de/de-030-27--ensalada-fr-a-tanqueta-de-.webp"
+  },
+  {
+    "itemId": "7695",
+    "category": "dulces_finos_buffet",
+    "name": "28. Bandeja de Arroz Imperial",
+    "description": "La joya de la corona en nuestra cocina: una base de arroz...",
+    "price": 75000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/0acf6a5f-7eba-4545-aa75-e98e49186fcb_large.webp",
+    "local_image": "/products/de/de-031-28--bandeja-de-arroz-imperial.webp"
+  },
+  {
+    "itemId": "7648",
+    "category": "tortas",
+    "name": "1. Torta Sencilla Rosas de Cumpleaños",
+    "description": "Elegante creación de cobertura lisa con un vibrante borde...",
+    "price": 9000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/da9f5cb9-35bd-430f-a293-f2dbf9461b40_large.webp",
+    "local_image": "/products/de/de-032-1--torta-sencilla-rosas-de-cum.webp"
+  },
+  {
+    "itemId": "7658",
+    "category": "tortas",
+    "name": "2. Torta Sencilla de Amor Eterno",
+    "description": "Delicado pastel circular cubierto en crema blanca con...",
+    "price": 9000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/6a9a691a-2265-47c3-a9ce-525044dc2beb_large.webp",
+    "local_image": "/products/de/de-033-2--torta-sencilla-de-amor-eter.webp"
+  },
+  {
+    "itemId": "7654",
+    "category": "tortas",
+    "name": "3. Torta Mediana Dulces Quince de Oro",
+    "description": "Elegante creación en rosa pastel con acabados lisos,...",
+    "price": 15000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/1f09941a-b1d0-4d82-befb-46342dc67d81_large.webp",
+    "local_image": "/products/de/de-034-3--torta-mediana-dulces-quince.webp"
+  },
+  {
+    "itemId": "7680",
+    "category": "tortas",
+    "name": "4. Torta Mediana Astro del Fútbol",
+    "description": "Pastel temático en azul vibrante inspirado en Messi y la...",
+    "price": 19000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/e9e4ec7a-da77-48c5-9dce-5772b0b340b6_large.webp",
+    "local_image": "/products/de/de-035-4--torta-mediana-astro-del-f-t.webp"
+  },
+  {
+    "itemId": "7652",
+    "category": "tortas",
+    "name": "5. Torta Mediana Al Nassr y Cristiano Ronaldo",
+    "description": "Pastel temático de fútbol en colores amarillo y azul con...",
+    "price": 10000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/ebc2c9d7-da91-4345-b68b-d7cfdd0187ea_large.webp",
+    "local_image": "/products/de/de-036-5--torta-mediana-al-nassr-y-cr.webp"
+  },
+  {
+    "itemId": "7655",
+    "category": "tortas",
+    "name": "6. Torta Mediana Dúo Stitch.",
+    "description": "Encantadora creación de dos niveles en tonos rosa y azul...",
+    "price": 10000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/e6c71198-300a-452e-9211-591c046c7b1c_large.webp",
+    "local_image": "/products/de/de-037-6--torta-mediana-d-o-stitch-.webp"
+  },
+  {
+    "itemId": "7656",
+    "category": "tortas",
+    "name": "7. Torta Mediana Tentación de Chocolate",
+    "description": "Elegante torta de altura media cubierto en crema moca con...",
+    "price": 10000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/841174a4-2bbe-4672-ad59-be6d97eec3c3_large.webp",
+    "local_image": "/products/de/de-038-7--torta-mediana-tentaci-n-de-.webp"
+  },
+  {
+    "itemId": "7679",
+    "category": "tortas",
+    "name": "8. Torta Mediana con Goteo de Chocolate y Moka",
+    "description": "Delicioso pastel circular cubierto en crema suave con un...",
+    "price": 10000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/461079a8-69b7-432a-a11f-8416352c180c_large.webp",
+    "local_image": "/products/de/de-039-8--torta-mediana-con-goteo-de-.webp"
+  },
+  {
+    "itemId": "7649",
+    "category": "tortas",
+    "name": "9. Torta Alta Majestad Imperial",
+    "description": "Sofisticada creación de altura en blanco perlado, decorada...",
+    "price": 19000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/9bdf0a1d-079a-48c2-83e1-5d99cf391380_large.webp",
+    "local_image": "/products/de/de-040-9--torta-alta-majestad-imperia.webp"
+  },
+  {
+    "itemId": "7661",
+    "category": "tortas",
+    "name": "10. Torta Alta Aventura Prehistórica de Dinosaurios",
+    "description": "Increíble diseño de selva jurásica con toppers de...",
+    "price": 19000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4470e466-ff63-44ec-85c7-0a462e4ae75b_large.webp",
+    "local_image": "/products/de/de-041-10--torta-alta-aventura-prehis.webp"
+  },
+  {
+    "itemId": "7662",
+    "category": "tortas",
+    "name": "11. Torta Alta Aniversario de Oro y Rosas",
+    "description": "Elegante creación de estructura alta con textura de ondas...",
+    "price": 19000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/fdd9b8e6-eac0-4a55-bcdd-e9ecb8c23223_large.webp",
+    "local_image": "/products/de/de-042-11--torta-alta-aniversario-de-.webp"
+  },
+  {
+    "itemId": "7678",
+    "category": "tortas",
+    "name": "12. Torta Alta Dos Corazones",
+    "description": "Elegante diseño en cobertura blanca con textura lineal,...",
+    "price": 19000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/368cf972-7bc7-4073-b471-0917dad3ddd8_large.webp",
+    "local_image": "/products/de/de-043-12--torta-alta-dos-corazones.webp"
+  },
+  {
+    "itemId": "7645",
+    "category": "cake_bandeja",
+    "name": "1. Cake de Bandeja Rosas de Lavanda",
+    "description": "Elegante pastel de bandeja cubierto en crema color lavanda...",
+    "price": 20000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4395e00c-feaa-4cf2-8381-2fd6abd8390b_large.webp",
+    "local_image": "/products/de/de-044-1--cake-de-bandeja-rosas-de-la.webp"
+  },
+  {
+    "itemId": "7642",
+    "category": "cake_bandeja",
+    "name": "2. Cake de Bandeja con Piso Tipo Torta Encima Temática Naruto",
+    "description": "Dinámico cake de bandeja de dos niveles en tonos azul y...",
+    "price": 25000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/daf52a92-516e-4edb-b037-28cfb2366832_large.webp",
+    "local_image": "/products/de/de-045-2--cake-de-bandeja-con-piso-ti.webp"
+  },
+  {
+    "itemId": "7643",
+    "category": "cake_bandeja",
+    "name": "3. Cake de Bandeja Tres Pisos Temática Messi",
+    "description": "Pastel temático de tres niveles en vibrante rosa y blanco,...",
+    "price": 30000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/fccba35a-3f69-4027-bbef-97281cc620dd_large.webp",
+    "local_image": "/products/de/de-046-3--cake-de-bandeja-tres-pisos-.webp"
+  },
+  {
+    "itemId": "7644",
+    "category": "cake_bandeja",
+    "name": "4. Cake de Tablero de Tres Pisos",
+    "description": "Pastel temático de tres niveles en vibrante rosa y blanco,...",
+    "price": 60000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/d78250f3-1ffc-4edb-ad82-818484590bff_large.webp",
+    "local_image": "/products/de/de-047-4--cake-de-tablero-de-tres-pis.webp"
+  },
+  {
+    "itemId": "7673",
+    "category": "pasteles_dos_pisos",
+    "name": "1. Pastel de Dos Pisos con Separador Acrílico Lumínico",
+    "description": "Sofisticado pastel de textura lisa con detalles en pan de...",
+    "price": 30000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/ddba5e45-fc21-4ebc-b111-f1989f6444a0_large.webp",
+    "local_image": "/products/de/de-048-1--pastel-de-dos-pisos-con-sep.webp"
+  },
+  {
+    "itemId": "7675",
+    "category": "pasteles_dos_pisos",
+    "name": "2. Pastel de Dos Pisos Princesas Disney",
+    "description": "Encantador diseño rosado con texturas estriadas, decorado...",
+    "price": 30000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/5ffd117c-f01c-4ec6-b9df-0d2f105d0f4d_large.webp",
+    "local_image": "/products/de/de-049-2--pastel-de-dos-pisos-princes.webp"
+  },
+  {
+    "itemId": "7676",
+    "category": "pasteles_dos_pisos",
+    "name": "3. Pastel de Dos Pisos Paw Patrol Skye",
+    "description": "Divertido pastel degradado en tonos rosa y azul con...",
+    "price": 30000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/ef280abf-4f86-4595-bf6a-1016087bd119_large.webp",
+    "local_image": "/products/de/de-050-3--pastel-de-dos-pisos-paw-pat.webp"
+  },
+  {
+    "itemId": "7664",
+    "category": "pasteles_tres_pisos",
+    "name": "1. Pastel de Tres Pisos Acrílico Lumínico con Rosas",
+    "description": "Elegante diseño en degradado rosa con un nivel central de...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/e24966bc-ae42-44a1-8c56-30613233dc96_large.webp",
+    "local_image": "/products/de/de-051-1--pastel-de-tres-pisos-acr-li.webp"
+  },
+  {
+    "itemId": "7665",
+    "category": "pasteles_tres_pisos",
+    "name": "2. Pastel de Tres Pisos Patrulla Canina",
+    "description": "Impresionante creación de tres niveles en azul cielo,...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/c1b45a63-2be7-45f4-b86f-91838157b6f8_large.webp",
+    "local_image": "/products/de/de-052-2--pastel-de-tres-pisos-patrul.webp"
+  },
+  {
+    "itemId": "7666",
+    "category": "pasteles_tres_pisos",
+    "name": "3. Pastel de Tres Pisos Stitch y Ángel",
+    "description": "Encantador diseño multinivel en rosa y azul turquesa,...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/4820ed2a-7278-44c9-a7a6-24f6aa2e05f6_large.webp",
+    "local_image": "/products/de/de-053-3--pastel-de-tres-pisos-stitch.webp"
+  },
+  {
+    "itemId": "7667",
+    "category": "pasteles_tres_pisos",
+    "name": "4. Pastel de Tres Pisos Marshall, Chase y Rubble.",
+    "description": "Divertido pastel tricolor con los rostros de Marshall,...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/227e4323-6491-4acc-9083-71fd4a54eadf_large.webp",
+    "local_image": "/products/de/de-054-4--pastel-de-tres-pisos-marsha.webp"
+  },
+  {
+    "itemId": "7668",
+    "category": "pasteles_tres_pisos",
+    "name": "5. Pastel de Tres Pisos Rayo McQueen",
+    "description": "Increíble pastel temático de tres niveles que recrea el...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/eb1d0fe4-a938-46b0-bb49-077112a9d9f3_large.webp",
+    "local_image": "/products/de/de-055-5--pastel-de-tres-pisos-rayo-m.webp"
+  },
+  {
+    "itemId": "7669",
+    "category": "pasteles_tres_pisos",
+    "name": "6. Pastel de Tres Pisos Fantasía Violeta",
+    "description": "Elegante creación en degradado lila decorada con delicadas...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/6bf44bd0-827d-40d8-94e1-ad8cf14ee26e_large.webp",
+    "local_image": "/products/de/de-056-6--pastel-de-tres-pisos-fantas.webp"
+  },
+  {
+    "itemId": "7670",
+    "category": "pasteles_tres_pisos",
+    "name": "7. Pastel de Tres Pisos Quinceañera con Separador Acrílico Lumínico",
+    "description": "Elegante diseño en lila y blanco con mariposas doradas,...",
+    "price": 35000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/bc4ff6a8-65c4-4d55-b836-8a685e83cafb_large.webp",
+    "local_image": "/products/de/de-057-7--pastel-de-tres-pisos-quince.webp"
+  },
+  {
+    "itemId": "7674",
+    "category": "pasteles_tres_pisos",
+    "name": "8. Pastel de Tres Pisos Bosque de Masha y el Oso",
+    "description": "Colorido diseño multinivel inspirado en el bosque, con...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/822ab79e-8117-49b4-a11a-3407994e85a2_large.webp",
+    "local_image": "/products/de/de-058-8--pastel-de-tres-pisos-bosque.webp"
+  },
+  {
+    "itemId": "7677",
+    "category": "pasteles_tres_pisos",
+    "name": "9. Pastel de Tres Pisos Temática La Sirenita",
+    "description": "Majestuoso diseño marino en degradado púrpura y turquesa,...",
+    "price": 40000.0,
+    "image": "https://pedidoswhats.app/uploads/restorants/af6657f3-34ad-4239-af38-16c627e6286c_large.webp",
+    "local_image": "/products/de/de-059-9--pastel-de-tres-pisos-tem-ti.webp"
+  }
+]

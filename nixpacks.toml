@@ -1,0 +1,38 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  NIXPACKS — Dulce Encanto (Railway deploy config)
+# ═══════════════════════════════════════════════════════════════════════════
+#  Railway usa este archivo para construir y desplegar la app.
+#  Requiere MySQL database agregada en Railway (variable DATABASE_URL).
+# ═══════════════════════════════════════════════════════════════════════════
+
+[phases.setup]
+nixPkgs = ['bun', 'openssl']
+
+[phases.install]
+cmds = [
+  'bun install',
+]
+
+[phases.build]
+cmds = [
+  # Cambiar a schema MySQL para producción
+  'cp prisma/schema.mysql.prisma prisma/schema.prisma',
+  # Generar Prisma Client
+  'bun run db:generate',
+  # Push schema a MySQL (crea tablas)
+  'bun run db:push',
+  # Sembrar datos iniciales
+  'bun run scripts/seed-dulce.ts',
+  'bun run scripts/seed-extras.ts',
+  'bun run scripts/seed-catalog.ts',
+  # Build de producción
+  'bun run build',
+]
+
+[start]
+cmd = 'bun run start'
+
+# Variables de entorno requeridas en Railway:
+# - DATABASE_URL: mysql://... (provista por Railway MySQL addon)
+# - JWT_SECRET: generar con openssl rand -hex 32
+# - NODE_ENV: production

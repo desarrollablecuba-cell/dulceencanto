@@ -1,0 +1,47 @@
+[
+  {
+    "id": "seed-zone-ciego-avila",
+    "name": "Ciego de Ávila (Ciudad)",
+    "description": "Entrega dentro del casco urbano de Ciego de Ávila y municipios cercanos (Majagua, Ceballos, Punta Alegre).",
+    "price": 1,
+    "estimatedTime": "Mismo día",
+    "active": true,
+    "order": 0,
+    "asapSurchargeOverride": true,
+    "asapSurchargeType": "fixed",
+    "asapSurchargeValue": 4,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2026-07-19T06:55:56.183Z",
+    "allowsPriorityDelivery": true
+  },
+  {
+    "description": "",
+    "price": 5,
+    "estimatedTime": "48 horas",
+    "active": true,
+    "order": 2,
+    "allowsPriorityDelivery": true,
+    "asapSurchargeOverride": true,
+    "asapSurchargeType": "fixed",
+    "asapSurchargeValue": 10,
+    "name": "Majagua",
+    "id": "zonemrrfzzu32rbnzkyx",
+    "createdAt": "2026-07-19T06:56:33.579Z",
+    "updatedAt": "2026-07-19T06:56:33.579Z"
+  },
+  {
+    "description": "",
+    "price": 20,
+    "estimatedTime": "72 horas",
+    "active": true,
+    "order": 3,
+    "allowsPriorityDelivery": false,
+    "asapSurchargeOverride": false,
+    "asapSurchargeType": "fixed",
+    "asapSurchargeValue": 0,
+    "name": "Esmeralda",
+    "id": "zonemrrg0nxcwz8j2l08",
+    "createdAt": "2026-07-19T06:57:04.800Z",
+    "updatedAt": "2026-07-19T06:57:04.800Z"
+  }
+]

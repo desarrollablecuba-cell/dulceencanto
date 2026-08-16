@@ -1,0 +1,101 @@
+[
+  {
+    "id": "seed-cat-0",
+    "name": "Oferta Especial",
+    "slug": "oferta-especial",
+    "icon": "🍱",
+    "image": "/categories/oferta-especial.webp",
+    "order": 0,
+    "active": false,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2026-07-04T04:16:21.427Z"
+  },
+  {
+    "id": "seed-cat-1",
+    "name": "Alimentos Elaborados y Repostería",
+    "slug": "alimentos-reposteria",
+    "icon": "🍕",
+    "image": "/categories/alimentos-reposteria.webp",
+    "order": 1,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-2",
+    "name": "Confituras",
+    "slug": "confituras",
+    "icon": "🍪",
+    "image": "/categories/confituras.webp",
+    "order": 2,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-3",
+    "name": "Productos Lácteos y Bebidas",
+    "slug": "lacteos-bebidas",
+    "icon": "🍨",
+    "image": "/categories/lacteos-bebidas.webp",
+    "order": 3,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-4",
+    "name": "Platos Fuertes y Cárnicos",
+    "slug": "platos-fuertes",
+    "icon": "🥩",
+    "image": "/categories/platos-fuertes.webp",
+    "order": 4,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-5",
+    "name": "Granos y Pastas",
+    "slug": "granos-pastas",
+    "icon": "🍚",
+    "image": "/categories/granos-pastas.webp",
+    "order": 5,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-6",
+    "name": "Enlatados y Conservas",
+    "slug": "enlatados",
+    "icon": "🥫",
+    "image": "/categories/enlatados.webp",
+    "order": 6,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-7",
+    "name": "Aseo Personal",
+    "slug": "aseo-personal",
+    "icon": "🧼",
+    "image": "/categories/aseo-personal.webp",
+    "order": 7,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "seed-cat-8",
+    "name": "Electrodomésticos",
+    "slug": "electrodomesticos",
+    "icon": "🔋",
+    "image": "/categories/electrodomesticos.webp",
+    "order": 8,
+    "active": true,
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]

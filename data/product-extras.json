@@ -1,0 +1,13 @@
+[
+  {
+    "productId": "seed-prod-1",
+    "name": "Confetis",
+    "description": "",
+    "priceMod": 0,
+    "required": false,
+    "sortOrder": 0,
+    "id": "pexmrdu6upx4ouvbv4w",
+    "createdAt": "2026-07-09T18:25:01.701Z",
+    "updatedAt": "2026-07-09T18:25:01.701Z"
+  }
+]
