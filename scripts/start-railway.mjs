@@ -84,23 +84,35 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
 }
 
 // ── 2. BD EN PARALELO (tablas + seeds, tolerante a fallos) ─────────────────
-const MAX_INTENTOS = 6;
+// Camino A: `prisma db push` (CLI). Si el schema engine no está disponible
+//           en el runtime (npm v11+ bloquea postinstall de @prisma/engines),
+//           falla sin crear tablas.
+// Camino B: DDL directo con el PrismaClient de la app (scripts/db-push-raw.mjs)
+//           — usa el motor de CONSULTAS, que siempre funciona porque la web
+//           lo usa. CREATE TABLE IF NOT EXISTS × 19 tablas.
 let dbLista = false;
-for (let i = 1; i <= MAX_INTENTOS; i++) {
-  console.log(`\n[db] Intento ${i}/${MAX_INTENTOS}: prisma db push...`);
+const MAX_INTENTOS = 3;
+for (let i = 1; i <= MAX_INTENTOS && !dbLista; i++) {
+  console.log(`\n[db] Camino A — Intento ${i}/${MAX_INTENTOS}: prisma db push...`);
   if (runSync('npx', ['prisma', 'db', 'push'], 120000)) {
     dbLista = true;
-    console.log('[db] ✓ Tablas verificadas/creadas');
-    break;
-  }
-  if (i < MAX_INTENTOS) {
-    console.log('[db] MySQL aún no responde. Esperando 10s (la app ya está online)...');
-    sleepSync(10000);
+    console.log('[db] ✓ Tablas verificadas/creadas (prisma db push)');
+  } else if (i < MAX_INTENTOS) {
+    console.log('[db] Falló. Esperando 5s (la app ya está online)...');
+    sleepSync(5000);
   }
 }
 
 if (!dbLista) {
-  console.error('\n[db] ⚠️ No se pudo conectar a la BD. La app sigue ARRIBA.');
+  console.log('\n[db] Camino B — DDL directo vía PrismaClient (db-push-raw)...');
+  if (runSync('node', ['scripts/db-push-raw.mjs'], 180000)) {
+    dbLista = true;
+    console.log('[db] ✓ Tablas creadas por SQL directo');
+  }
+}
+
+if (!dbLista) {
+  console.error('\n[db] ⚠️ No se pudo preparar la BD. La app sigue ARRIBA.');
   console.error('[db] ⚠️ Revisa DATABASE_URL. Las APIs fallarán hasta arreglarlo.');
 } else {
   const seeds = ['seed-dulce.ts', 'seed-extras.ts', 'seed-catalog.ts'];
