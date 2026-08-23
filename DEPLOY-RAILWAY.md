@@ -4,13 +4,29 @@ Guía paso a paso para subir este zip a Railway.
 
 ---
 
+## Cómo funciona este deploy (importante)
+
+- **Fase de BUILD**: solo compila la app. **NO toca la base de datos**
+  (el contenedor de build de Railway no tiene acceso a la red privada,
+  por eso las tablas NO se crean en el build).
+- **Arranque del servidor** (`scripts/start-railway.mjs`): crea las
+  tablas con `prisma db push` (con reintentos hasta ~75s esperando a que
+  MySQL esté listo) y ejecuta los seeds. Luego levanta el servidor web.
+  - Primer arranque: tarda **~1-2 minutos extra** — es normal que la URL
+    muestre "Application failed to respond" durante ese rato.
+  - Arranques siguientes: casi instantáneo (todo se auto-omite si ya está).
+  - Los seeds solo siembran si la BD está **vacía** — los redeploys no
+    borran pedidos ni datos reales.
+
+---
+
 ## Paso 1: Subir el código a GitHub
 
 1. Crea un repositorio nuevo en GitHub (puede ser privado).
 2. Extrae este zip y sube **todo su contenido** a ese repositorio
    (desde la web de GitHub: *Add file → Upload files*, o con git).
-3. Asegúrate de que el archivo `.env.example` se subió (GitHub a veces
-   oculta archivos que empiezan con punto — usa "Upload files" y verifica).
+3. Verifica que se subió el archivo `.env.example` y la carpeta `scripts/`
+   (en especial `scripts/start-railway.mjs`).
 
 > No subas nunca un archivo `.env` real con contraseñas a GitHub.
 
@@ -20,97 +36,97 @@ Guía paso a paso para subir este zip a Railway.
 
 1. Entra a [railway.app](https://railway.app) e inicia sesión.
 2. **New Project → Deploy from GitHub repo**.
-3. Autoriza Railway a acceder a tu cuenta de GitHub y elige el repositorio.
-4. Railway creará un servicio **Web** con la app Next.js.
-
-> El primer deploy FALLARÁ o quedará en espera hasta completar el Paso 4
-> (falta la base de datos). Es normal.
+3. Elige el repositorio. Railway crea el servicio **Web**.
 
 ---
 
 ## Paso 3: Agregar MySQL
 
-1. En el proyecto de Railway, pulsa **+ Create** (o el botón + abajo a la derecha).
-2. **Database → Add MySQL**.
-3. Railway crea el servicio MySQL con su propia `DATABASE_URL` interna.
+1. En el proyecto, **+ Create → Database → Add MySQL**.
+2. Railway crea el servicio MySQL con su `DATABASE_URL` interna.
 
 ---
 
 ## Paso 4: Conectar la base de datos al servicio Web (¡CRÍTICO!)
 
-1. Haz clic en el servicio **Web** (la app).
-2. Pestaña **Variables → New Variable**.
-3. Nombre: `DATABASE_URL` → en el valor, pulsa **"Reference variable"** y
-   selecciona la `DATABASE_URL` del servicio **MySQL**.
-   - Quedará algo como: `${{MySQL.DATABASE_URL}}`
-   - El formato final es: `mysql://root:pass@host:port/railway`
+1. Haz clic en el servicio **Web**.
+2. **Variables → New Variable**.
+3. Nombre: `DATABASE_URL` → pulsa **"Reference variable"** y selecciona la
+   `DATABASE_URL` (o `MYSQL_URL`) del servicio **MySQL**.
+   - Queda como: `${{MySQL.DATABASE_URL}}`
+   - También funciona pegada a mano:
+     `mysql://root:PASS@mysql.railway.internal:3306/railway`
+   - ⚠️ Si la pegas a mano y Railway rota la contraseña, se rompe.
+     Con "Reference variable" se actualiza sola.
 
 ---
 
 ## Paso 5: Agregar las variables restantes
 
-En el mismo servicio Web → Variables, agrega:
+En el servicio Web → Variables:
 
 | Variable  | Valor |
 |-----------|-------|
-| `JWT_SECRET` | Cadena aleatoria larga (puedes generarla en https://generate-secret.com o con `openssl rand -hex 32`) |
+| `JWT_SECRET` | Cadena aleatoria larga (https://generate-secret.com o `openssl rand -hex 32`) |
 | `NODE_ENV` | `production` |
 
 ---
 
 ## Paso 6: Deploy
 
-1. Pestaña **Settings** del servicio Web → verifica **Build** (Nixpacks).
-2. **Deployments → Deploy latest commit**.
-3. Railway ejecutará automáticamente:
-   - `bun install` — instala dependencias
-   - `prisma generate` — genera el cliente Prisma
-   - `prisma db push` — **crea todas las tablas en MySQL**
-   - Seeds — insertan catálogo, servicios, promociones, galería y admin
-   - `next build` — compila la app
-   - `node .next/standalone/server.js` — inicia el servidor
-
-⏱️ El primer deploy tarda **~5-10 minutos**.
-
-### Sobre los seeds (datos iniciales)
-- Solo se siembran **la primera vez** (cuando la BD está vacía).
-- Los redeploys **NO borran** pedidos ni datos reales.
-- Si algún día quieres re-sembrar todo desde cero: agrega la variable
-  `FORCE_SEED=1`, haz deploy, y luego **elimínala** y despliega de nuevo.
+1. **Deployments → Deploy latest commit**.
+2. El build (~5-8 min) instala dependencias y compila **sin tocar la BD**.
+3. Al terminar, Railway arranca el servidor → aquí se crean las tablas y
+   se siembran los datos (~1-2 min la primera vez).
+4. **Settings → Networking → Generate Domain** para obtener la URL.
 
 ---
 
-## Paso 7: Abrir la tienda
+## Paso 7: Verificar que todo quedó bien
 
-1. Servicio Web → **Settings → Networking → Generate Domain**
-   (o añade tu dominio propio).
-2. Tienda: `https://tu-app.up.railway.app`
+1. `https://tu-app.up.railway.app` → debe cargar la tienda.
+2. `https://tu-app.up.railway.app/api/seed` → debe responder:
+   `"products": 56, "categories": 5, "admins": 1, "siteConfig": "configured"`.
 3. Admin: `https://tu-app.up.railway.app/admin`
    - Email: `admin@dulceencanto.com`
    - Password: `DulceAdmin2026!`
 
-> ⚠️ **Cambia la contraseña del admin** después del primer login.
+> ⚠️ **Cambia la contraseña del admin** tras el primer login, y configura
+> el **correo de Zelle** desde el panel (pagos USD desde el exterior).
 
 ---
 
 ## 🔧 Solución de problemas
 
-### El deploy falla en `prisma db push`
-`DATABASE_URL` no está conectada al servicio Web. Repite el Paso 4.
+### "Application failed to respond"
+1. **Deployments** → abre el deploy → **View Logs**.
+   - Si el BUILD falló: verás el error en la pestaña de build (p.ej.
+     dependencias). Corrige y re-deploya.
+   - Si el build está OK: mira los **logs de runtime**. En el primer
+     arranque verás `[db] Intento 1/15...` — espera ~2 min. Si ves
+     `[db] ⚠️ No se pudo conectar a la BD`, el problema es `DATABASE_URL`.
+2. Espera 2-3 minutos: el primer arranque prepara la BD.
 
-### La app arranca pero se ve vacía
-Las tablas no se crearon o los seeds no corrieron. Verifica que
-`DATABASE_URL` esté en el servicio **Web** (no solo en el MySQL) y
-re-deploya. Puedes verificar visitando `https://tu-app.railway.app/api/seed`
-(debe responder con conteos de productos/categorías/admins).
+### La BD sigue sin tablas
+`DATABASE_URL` mal configurada en el servicio **Web**. Repite el Paso 4.
+Verifica en los logs de runtime que no aparezca `Can't reach database
+server`. Comprueba también que la URL empiece por `mysql://` (no `mysql+pooled`).
 
-### Se ve sin estilos o sin imágenes
-Re-deploya. El build copia `public/` y `.next/static` al servidor standalone.
+### Error P1001 "Can't reach database server" en los logs de arranque
+El host debe ser `mysql.railway.internal` (red privada) o el host público
+que muestra Railway en las variables del MySQL. Usa "Reference variable".
+
+### Login admin da "Error interno del servidor"
+Falta `JWT_SECRET` en el servicio Web (Paso 5).
+
+### Necesito re-sembrar todo desde cero
+Agrega la variable `FORCE_SEED=1`, redeploya, espera el arranque, y luego
+**elimina la variable** y redeploya de nuevo.
 
 ### Imágenes subidas por el admin desaparecen tras un redeploy
-El sistema de archivos de Railway es efímero. Las imágenes incluidas en el
-repo no se pierden; solo las subidas desde el panel admin después del deploy.
-Guárdalas y súbelas de nuevo, o súbelas al repo en `public/products/`.
+El filesystem de Railway es efímero. Las imágenes del repo no se pierden;
+solo las subidas por el panel después del deploy. Súbelas al repo en
+`public/products/` para que duren.
 
 ---
 

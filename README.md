@@ -20,8 +20,11 @@ Resumen rápido:
 4. En el servicio Web, referencia la variable `DATABASE_URL` del MySQL
    (botón "Reference Variable").
 5. Agrega `JWT_SECRET` y `NODE_ENV=production`.
-6. Deploy — Railway crea tablas, siembra datos y compila automáticamente
-   (config en `nixpacks.toml`).
+6. Deploy — el build **solo compila** (sin tocar la BD: el contenedor de
+   build no tiene acceso a la red privada). Las **tablas y datos se crean
+   en el primer arranque** del servidor (`scripts/start-railway.mjs`,
+   con reintentos hasta que MySQL esté listo). Primer arranque: ~1-2 min
+   extra; los siguientes son casi instantáneos.
 
 ### Hostinger (hPanel)
 1. hPanel → Bases de datos MySQL → crear BD.

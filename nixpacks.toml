@@ -3,58 +3,60 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Railway usa este archivo para construir y desplegar la app.
 #
+#  ⚠️ LECCIÓN APRENDIDA (importante):
+#  El contenedor de BUILD de Railway NO tiene acceso a la red privada
+#  (mysql.railway.internal). Por eso `prisma db push` y los seeds NO se
+#  ejecutan en la fase de build — fallarían con "Can't reach database
+#  server" y romperían el deploy.
+#
+#  La preparación de la BD (crear tablas + sembrar datos) se hace en el
+#  ARRANQUE del servidor (scripts/start-railway.mjs), donde SÍ hay red
+#  privada. En el primer arranque tarda ~1-2 min extra; en los siguientes
+#  es casi instantáneo (todo se auto-omite si ya está hecho).
+#
 #  PASOS EN RAILWAY:
 #  1. Sube el código a GitHub
 #  2. Railway: New Project > Deploy from GitHub repo
-#  3. Add > Database > MySQL (Railway genera DATABASE_URL automáticamente)
-#  4. En el servicio WEB, ve a Variables > Reference Variables
-#     y selecciona DATABASE_URL del MySQL service
+#  3. Add > Database > MySQL
+#  4. En el servicio WEB, ve a Variables > Reference Variables y selecciona
+#     DATABASE_URL del servicio MySQL
 #  5. Agregar variables: JWT_SECRET y NODE_ENV=production
 #  6. Deploy
 # ═══════════════════════════════════════════════════════════════════════════
 
 [phases.setup]
-nixPkgs = ['bun', 'openssl', 'nodejs']
+nixPkgs = ['nodejs', 'openssl']
 
 [phases.install]
 cmds = [
-  'bun install',
+  # --include=dev es OBLIGATORIO: con NODE_ENV=production npm omite las
+  # devDependencies, y typescript/tsx/prisma-related se necesitan para
+  # compilar y arrancar.
+  'npm install --include=dev --no-audit --no-fund',
 ]
 
 [phases.build]
 cmds = [
-  # Generar Prisma Client
-  'bun run db:generate',
-  # Crear tablas en MySQL (usa DATABASE_URL de Railway)
-  'bun run db:push',
-  # Sembrar datos iniciales (solo si la BD está vacía; para forzar: FORCE_SEED=1)
-  'bun run scripts/seed-dulce.ts',
-  'bun run scripts/seed-extras.ts',
-  'bun run scripts/seed-catalog.ts',
-  # Build de producción
-  'bun run build',
+  # Generar Prisma Client (sin tocar la BD)
+  'npx prisma generate',
+  # Build de producción (next build + copia de static/public/data)
+  'npm run build',
 ]
 
 [start]
-cmd = 'node .next/standalone/server.js'
+# Prepara la BD (tablas + seeds con reintentos) y luego arranca el server.
+# Ver scripts/start-railway.mjs para el detalle completo.
+cmd = 'node scripts/start-railway.mjs'
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  VARIABLES DE ENTORNO REQUERIDAS EN RAILWAY:
-# ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+#  VARIABLES DE ENTORNO REQUERIDAS EN EL SERVICIO WEB:
 #
-#  DATABASE_URL → Click en "Reference Variables" y selecciona la del MySQL addon
-#                 (formato: mysql://root:pass@host:port/railway)
+#  DATABASE_URL → "Reference Variable" de la BD MySQL
+#                 (formato: mysql://root:pass@mysql.railway.internal:3306/railway)
 #
 #  JWT_SECRET   → Generar con: openssl rand -hex 32
 #
 #  NODE_ENV     → production
 #
-#  ══════════════════════════════════════════════════════════════════════
-#  ⚠️ IMPORTANTE: Railway crea 2 servicios separados:
-#  1. MySQL (la base de datos)
-#  2. Web (la aplicación Next.js)
-#
-#  Debes "referenciar" las variables del MySQL en el servicio Web:
-#  Web service > Variables > New Variable > Name: DATABASE_URL
-#  > Value: ${MySQL.DATABASE_URL}  (click "Reference Variable")
-#  ══════════════════════════════════════════════════════════════════════
+#  FORCE_SEED   → (opcional) 1 = forzar resiembra completa. ¡Quitar después!
+# ═══════════════════════════════════════════════════════════════════════
