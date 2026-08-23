@@ -70,8 +70,8 @@ NODE_ENV=production
 2. **Create application**:
    - **Versión de Node**: 20 o superior (recomendado 20 o 22).
    - **Application root**: la carpeta donde extrajiste el zip (Paso 2).
-   - **Application startup file**: `.next/standalone/server.js`
-     *(se creará después del build — puedes ponerlo ya)*.
+   - **Application startup file**: `scripts/start-railway.mjs`
+     *(mejor que server.js directo: fuerza bind 0.0.0.0 y prepara la BD — se creará después de subir el código)*.
    - **Modo producción**.
 3. Guarda. Aún NO funcionará: falta instalar y compilar.
 
@@ -106,7 +106,9 @@ npm run build
 ## Paso 6: Iniciar / Reiniciar la app
 
 1. En hPanel → Node.js → tu aplicación → **Restart** (o Run).
-2. El startup file `.next/standalone/server.js` levanta el servidor.
+2. El startup file `scripts/start-railway.mjs` levanta el servidor
+   (fuerza bind 0.0.0.0 — el server.js directo puede crashear si el
+   gestor define HOSTNAME — y prepara la BD en paralelo).
 3. Abre tu dominio: `https://tudominio.com`
 
 - Tienda: `https://tudominio.com`
@@ -148,7 +150,7 @@ La `DATABASE_URL` está mal. Verifica usuario/contraseña (URL-encoded) y que
 el host sea `localhost`.
 
 ### La app no arranca (502/passenger)
-Confirma que el **startup file** sea `.next/standalone/server.js` y que la
+Confirma que el **startup file** sea `scripts/start-railway.mjs` y que la
 carpeta `.next/standalone` exista (Paso 5 terminó bien). Reinicia la app.
 
 ### Necesito re-sembrar los datos desde cero

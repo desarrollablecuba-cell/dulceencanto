@@ -50,8 +50,20 @@ if (!existsSync('.next/standalone/server.js')) {
   process.exit(1);
 }
 
-console.log('[web] Iniciando servidor Next.js standalone...');
-const server = spawn('node', ['.next/standalone/server.js'], { stdio: 'inherit' });
+// ⚠️ FIX CRÍTICO: el server.js standalone de Next.js hace
+//   `const hostname = process.env.HOSTNAME || '0.0.0.0'`
+// En los contenedores de Railway (Linux), HOSTNAME = ID del contenedor
+// (p.ej. "a1b2c3d4e5"), un nombre que no se puede resolver como dirección
+// → el servidor crashea al hacer listen() → "service unavailable" 5 min
+// → "1/1 replicas never became healthy". Forzamos 0.0.0.0 (todas las
+// interfaces), que es lo que Railway necesita.
+const serverEnv = { ...process.env, HOSTNAME: '0.0.0.0' };
+
+console.log(`[web] Iniciando servidor Next.js standalone (PORT=${process.env.PORT || 3000}, bind 0.0.0.0)...`);
+const server = spawn('node', ['.next/standalone/server.js'], {
+  stdio: 'inherit',
+  env: serverEnv,
+});
 
 server.on('error', (err) => {
   console.error('[web] ❌ Error al iniciar el servidor:', err);
