@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build && node scripts/postbuild.mjs",
-    "start": "NODE_ENV=production node .next/standalone/server.js",
-    "start:win": "node .next/standalone/server.js",
+    "start": "node scripts/start-railway.mjs",
+    "start:server": "node .next/standalone/server.js",
+    "start:win": "node scripts/start-railway.mjs",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
@@ -94,6 +95,7 @@
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.19.2",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
     "z-ai-web-dev-sdk": "^0.0.18",
@@ -109,7 +111,6 @@
     "eslint-config-next": "^16.1.1",
     "mysql2": "^3.11.0",
     "tailwindcss": "^4",
-    "tsx": "^4.19.2",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
   }
