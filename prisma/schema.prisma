@@ -5,7 +5,10 @@
 // Los campos JSON se guardan como @db.LongText para evitar límites de VARCHAR.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Portabilidad: native (donde se compila) + objetivos comunes de
+  // producción: Railway (Debian) y Hostinger (CloudLinux/RHEL).
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x", "rhel-openssl-1.1.x"]
 }
 
 datasource db {

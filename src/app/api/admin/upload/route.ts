@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { requireAdmin, unauthorized } from '@/lib/auth';
@@ -8,7 +8,21 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'products');
+/**
+ * En producción con `output: "standalone"`, Next.js sirve los archivos de
+ * public/ desde .next/standalone/public. Si escribimos en el public/ de la
+ * raíz del proyecto, las imágenes subidas darían 404. Por eso: si existe
+ * .next/standalone, se escribe ahí; si no (dev), en public/ normal.
+ */
+function resolveUploadDir(): string {
+  const root = process.cwd();
+  const standalonePublic = path.join(root, '.next', 'standalone', 'public');
+  if (existsSync(standalonePublic)) {
+    return path.join(standalonePublic, 'products');
+  }
+  return path.join(root, 'public', 'products');
+}
+
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/webp', 'image/jpeg', 'image/png', 'image/gif'];
 
@@ -34,10 +48,11 @@ export async function POST(request: Request) {
     const timestamp = Date.now();
     const random = randomBytes(6).toString('hex');
     const filename = `prod-${timestamp}-${random}.${ext}`;
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    const uploadDir = resolveUploadDir();
+    await fs.mkdir(uploadDir, { recursive: true });
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const filepath = path.join(UPLOAD_DIR, filename);
+    const filepath = path.join(uploadDir, filename);
     await fs.writeFile(filepath, buffer);
     return NextResponse.json({ path: `/products/${filename}` });
   } catch (error) {

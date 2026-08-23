@@ -51,6 +51,12 @@ button {
   100% { transform: translateX(-50%); }
 }
 
+/* Inter autohospedada vía @fontsource (familia CSS "Inter").
+   Variable que antes definía next/font/google. */
+:root {
+  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

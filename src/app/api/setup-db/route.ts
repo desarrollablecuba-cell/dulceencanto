@@ -22,7 +22,7 @@ function readJson<T>(filename: string): T | null {
 /**
  * GET /api/setup-db
  *
- * Inicializa la base de datos SQLite:
+ * Inicializa la base de datos (MySQL o SQLite según DATABASE_URL):
  *  1. Limpia todas las tablas (orden por dependencias).
  *  2. Siembra los datos desde /data/*.json (productos, categorías, admin, etc.).
  *
@@ -32,19 +32,22 @@ export async function GET() {
   const results: string[] = [];
 
   try {
-    // ── PASO 1: limpiar tablas (SQLite, respetando FKs) ──
-    const tables = [
-      'OrderItem', 'Order',
-      'ProductExtra', 'ProductCombination', 'VariantOption', 'VariantGroup',
-      'WholesaleTier', 'Product',
-      'Review', 'Customer', 'DeliveryZone',
-      'Category', 'SiteConfig', 'Admin',
-    ];
-    await db.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
-    for (const t of tables) {
-      try { await db.$executeRawUnsafe(`DELETE FROM "${t}";`); } catch { /* tabla no existe */ }
-    }
-    await db.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
+    // ── PASO 1: limpiar tablas (orden por dependencias, deleteMany
+    //    funciona tanto en MySQL como en SQLite) ──
+    await db.orderItem.deleteMany({});
+    await db.order.deleteMany({});
+    await db.productExtra.deleteMany({});
+    await db.productCombination.deleteMany({});
+    await db.variantOption.deleteMany({});
+    await db.variantGroup.deleteMany({});
+    await db.wholesaleTier.deleteMany({});
+    await db.review.deleteMany({});
+    await db.product.deleteMany({});
+    await db.customer.deleteMany({});
+    await db.deliveryZone.deleteMany({});
+    await db.category.deleteMany({});
+    await db.siteConfig.deleteMany({});
+    await db.admin.deleteMany({});
     results.push('Tablas limpiadas');
 
     // ── PASO 2: sembrar desde JSON ──
@@ -384,7 +387,7 @@ export async function GET() {
 
     return NextResponse.json({
       status: 'success',
-      message: 'Base de datos SQLite creada y sembrada correctamente',
+      message: 'Base de datos creada y sembrada correctamente',
       results,
     });
   } catch (error: any) {

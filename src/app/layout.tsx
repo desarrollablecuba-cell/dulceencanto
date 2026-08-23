@@ -1,31 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+// Fuentes AUTOHOSPEDADAS: no se descargan de Google Fonts durante el build
+// (el build funciona incluso sin internet / redes inestables).
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "@fontsource/inter/300.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/inter/800.css";
+import "@fontsource/inter/900.css";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { BrandThemeApplier } from "@/components/ecommerce/BrandTheme";
 import { PWAInstallPrompt } from "@/components/ecommerce/PWAInstallPrompt";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Precargamos Inter como fuente por defecto del Design System. Es la
-// fuente del tema "Clásico Naranja" (default). Si el admin cambia a un
-// tema con otra fuente (Poppins, Montserrat, etc.), BrandThemeApplier la
-// carga dinámicamente desde Google Fonts en runtime.
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  display: "swap",
-});
+// Inter se sirve autohospedada vía @fontsource (familia CSS "Inter");
+// la variable --font-inter se define en globals.css.
 
 export const metadata: Metadata = {
   title: "Dulce Encanto — Repostería Artesanal para tus Momentos Especiales",
@@ -67,7 +59,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
+        className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
         style={{ backgroundColor: '#ffffff', color: '#111827' }}
       >
         {/* Aplica todos los tokens del Design System (paleta, tipografía,

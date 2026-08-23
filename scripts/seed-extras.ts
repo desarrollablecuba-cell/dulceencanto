@@ -84,35 +84,35 @@ const promotions = [
     id: 'promo-madres', title: 'Día de las Madres',
     description: 'Sorprende a mamá con una tarta personalizada + 6 cupcakes + galletas decoradas. Combo especial con 15% de descuento.',
     occasion: 'dia_madres', discountPct: 15,
-    image: '/promo-madres.webp',
+    image: '/gallery-15anos.webp',
     startDate: `${new Date().getFullYear()}-05-01`, endDate: `${new Date().getFullYear()}-05-15`, order: 0,
   },
   {
     id: 'promo-padres', title: 'Día de los Padres',
     description: 'Tarta temática de papá + pullover personalizado sublimado. Un detalle que enamora. 10% de descuento en el combo.',
     occasion: 'dia_padres', discountPct: 10,
-    image: '/promo-padres.webp',
+    image: '/hero-slide-2.webp',
     startDate: `${new Date().getFullYear()}-06-01`, endDate: `${new Date().getFullYear()}-06-21`, order: 1,
   },
   {
     id: 'promo-san-valentin', title: 'San Valentín',
     description: 'Combo romántico: mini cake de fresa + 6 cupcakes + galletas en forma de corazón. Para celebrar el amor.',
     occasion: 'san_valentin', discountPct: 12,
-    image: '/promo-valentin.webp',
+    image: '/products/de/de-000-1----dulzura-en-pareja.webp',
     startDate: `${new Date().getFullYear()}-02-01`, endDate: `${new Date().getFullYear()}-02-14`, order: 2,
   },
   {
     id: 'promo-mujer', title: 'Día de la Mujer',
     description: 'Caja regalo especial: cupcakes surtidos + galletas decoradas + vela aromática. Para las mujeres extraordinarias.',
     occasion: 'dia_mujer', discountPct: 10,
-    image: '/promo-mujer.webp',
+    image: '/gallery-cumple-adultos.webp',
     startDate: `${new Date().getFullYear()}-03-01`, endDate: `${new Date().getFullYear()}-03-08`, order: 3,
   },
   {
     id: 'promo-fin-anio', title: 'Fin de Año',
     description: 'Cierra el año con dulzura: tarta de cumple + combo postres fríos + copas de champaña comestibles. 20% de descuento.',
     occasion: 'fin_anio', discountPct: 20,
-    image: '/promo-fin-anio.webp',
+    image: '/hero-slide-5.webp',
     startDate: `${new Date().getFullYear()}-12-15`, endDate: `${new Date().getFullYear()}-12-31`, order: 4,
   },
 ];
@@ -146,13 +146,20 @@ async function main() {
   console.log('  🎉 SEMILLA — Servicios, Promociones y Galería');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // Limpiar
+  // Guard: si ya hay servicios, omitir (protege datos reales en redeploys).
+  const existingServices = await prisma.service.count();
+  if (existingServices > 0 && process.env.FORCE_SEED !== '1') {
+    console.log(`  ⏭️  La BD ya contiene ${existingServices} servicios. Seed omitido.`);
+    console.log('  ⏭️  Para forzar la resiembra: FORCE_SEED=1\n');
+    return;
+  }
+
+  // Limpiar (deleteMany = compatible MySQL y SQLite).
+  // NO se tocan EventReservation/EventReservationItem: son datos reales.
   console.log('🧹 Limpiando tablas...');
-  await prisma.$executeRawUnsafe('DELETE FROM "EventReservationItem";');
-  await prisma.$executeRawUnsafe('DELETE FROM "EventReservation";');
-  await prisma.$executeRawUnsafe('DELETE FROM "Service";');
-  await prisma.$executeRawUnsafe('DELETE FROM "Promotion";');
-  await prisma.$executeRawUnsafe('DELETE FROM "GalleryItem";');
+  await prisma.service.deleteMany({});
+  await prisma.promotion.deleteMany({});
+  await prisma.galleryItem.deleteMany({});
   console.log('  ✓ Limpiado\n');
 
   // Servicios

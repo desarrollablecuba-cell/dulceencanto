@@ -76,19 +76,33 @@ async function main() {
   console.log('  🧁 SEMILLA — Catálogo real Dulce Encanto');
   console.log('═══════════════════════════════════════════════════════\n');
 
+  // Guard: si el catálogo real ya fue sembrado (productos de-prod-*), omitir.
+  const existingCatalog = await prisma.product.count({ where: { id: { startsWith: 'de-prod-' } } });
+  if (existingCatalog > 0 && process.env.FORCE_SEED !== '1') {
+    console.log(`  ⏭️  El catálogo ya está sembrado (${existingCatalog} productos). Seed omitido.`);
+    console.log('  ⏭️  Para forzar la resiembra: FORCE_SEED=1\n');
+    return;
+  }
+
   // Load scraped products
   const scrapedPath = path.join(process.cwd(), 'data', 'scraped-products.json');
   const scraped: ScrapedProduct[] = JSON.parse(fs.readFileSync(scrapedPath, 'utf-8'));
   console.log(`📂 ${scraped.length} productos scrapeados cargados`);
 
-  // Limpiar productos y categorías existentes (NO tocar servicios existentes)
+  // Limpiar productos y categorías existentes (NO tocar servicios ni pedidos).
+  // deleteMany = compatible MySQL y SQLite. Orden: hijas antes que padres.
+  // Los pedidos se conservan: OrderItem.productId es un string sin FK.
   console.log('🧹 Limpiando productos y categorías...');
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
-  await prisma.$executeRawUnsafe('DELETE FROM "Product";');
-  await prisma.$executeRawUnsafe('DELETE FROM "Category";');
+  await prisma.review.deleteMany({}); // reseñas apuntan a productos que se borran
+  await prisma.productExtra.deleteMany({});
+  await prisma.productCombination.deleteMany({});
+  await prisma.variantOption.deleteMany({});
+  await prisma.variantGroup.deleteMany({});
+  await prisma.wholesaleTier.deleteMany({});
+  await prisma.product.deleteMany({});
+  await prisma.category.deleteMany({});
   // Solo eliminar servicios de sueños_sorpresa (los 10 originales se conservan)
-  await prisma.$executeRawUnsafe('DELETE FROM "Service" WHERE category = \'suenos_sorpresa\';');
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
+  await prisma.service.deleteMany({ where: { category: 'suenos_sorpresa' } });
   console.log('  ✓ Limpiado (servicios originales conservados)\n');
 
   // Crear categorías

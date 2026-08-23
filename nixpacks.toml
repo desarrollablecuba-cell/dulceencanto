@@ -27,7 +27,7 @@ cmds = [
   'bun run db:generate',
   # Crear tablas en MySQL (usa DATABASE_URL de Railway)
   'bun run db:push',
-  # Sembrar datos iniciales
+  # Sembrar datos iniciales (solo si la BD está vacía; para forzar: FORCE_SEED=1)
   'bun run scripts/seed-dulce.ts',
   'bun run scripts/seed-extras.ts',
   'bun run scripts/seed-catalog.ts',

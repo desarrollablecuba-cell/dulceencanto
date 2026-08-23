@@ -2,90 +2,63 @@
 
 Tienda online de repostería artesanal en Ciego de Ávila, Cuba.
 
-## 🚀 Despliegue en Railway con MySQL
+**Pagos**: Zelle en USD desde el exterior + pago local en CUP desde Cuba.
 
-### Paso 1: Subir código a GitHub
-Sube todo el contenido del zip a un repositorio de GitHub.
+## 📦 Despliegue
 
-### Paso 2: Crear proyecto en Railway
-1. Ve a [railway.app](https://railway.app) → **New Project**
-2. Selecciona **Deploy from GitHub repo**
-3. Elige tu repositorio
+| Guía | Archivo |
+|------|---------|
+| 🚀 Railway + MySQL | [`DEPLOY-RAILWAY.md`](./DEPLOY-RAILWAY.md) |
+| 🖥️ Hostinger hPanel + MySQL | [`DEPLOY-HOSTINGER.md`](./DEPLOY-HOSTINGER.md) |
 
-### Paso 3: Agregar MySQL (¡IMPORTANTE!)
-1. En el proyecto de Railway, click **+** (abajo a la derecha)
-2. Selecciona **Add Database** → **MySQL**
-3. Railway creará un servicio MySQL con estas variables automáticas:
-   - `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`
-   - **`MYSQL_URL`** o **`DATABASE_URL`** (URL de conexión completa)
+Resumen rápido:
 
-### Paso 4: Conectar DATABASE_URL al servicio Web (¡CRÍTICO!)
-1. Click en tu servicio **Web** (la app Next.js)
-2. Ve a la pestaña **Variables**
-3. Click **New Variable**
-4. Name: `DATABASE_URL`
-5. Value: click en el botón **"Reference Variable"** y selecciona `DATABASE_URL` del servicio MySQL
-   - O manualmente: `${{MySQL.DATABASE_URL}}`
-   - El formato será algo como: `mysql://root:pass@host:port/railway`
+### Railway
+1. Sube el código a GitHub.
+2. Railway → New Project → Deploy from GitHub repo.
+3. Add Database → **MySQL**.
+4. En el servicio Web, referencia la variable `DATABASE_URL` del MySQL
+   (botón "Reference Variable").
+5. Agrega `JWT_SECRET` y `NODE_ENV=production`.
+6. Deploy — Railway crea tablas, siembra datos y compila automáticamente
+   (config en `nixpacks.toml`).
 
-### Paso 5: Agregar variables adicionales
-En el mismo servicio Web → Variables:
+### Hostinger (hPanel)
+1. hPanel → Bases de datos MySQL → crear BD.
+2. Gestor de archivos → subir y extraer este zip.
+3. Crear `.env` con `DATABASE_URL=mysql://usuario:clave@localhost:3306/bd`.
+4. Terminal: `npm install && npx prisma db push && npm run seed:all && npm run build`.
+5. App Node.js (hPanel → Avanzado → Node.js), startup file:
+   `.next/standalone/server.js`.
 
-| Variable | Valor |
-|----------|-------|
-| `JWT_SECRET` | (genera con: `openssl rand -hex 32`) |
-| `NODE_ENV` | `production` |
+## 🔐 Acceso al admin
 
-### Paso 6: Deploy
-Railway construirá automáticamente:
-1. `bun install` — instala dependencias
-2. `prisma generate` — genera el cliente de Prisma
-3. `prisma db push` — **crea todas las tablas en MySQL**
-4. Seeds — inserta productos, categorías y configuración inicial
-5. `next build` — compila la app para producción
-6. `node .next/standalone/server.js` — inicia el servidor
-
-⏱️ El primer deploy tarda **~3-5 minutos**.
-
-### Paso 7: Acceder al admin
-- URL: `https://tu-app.railway.app/admin`
+- URL: `/admin`
 - Email: `admin@dulceencanto.com`
 - Password: `DulceAdmin2026!`
 
-> ⚠️ **Cambia estas credenciales** después del primer login.
+> ⚠️ Cambia estas credenciales tras el primer login.
 
----
+## 🌱 Seeds (datos iniciales)
 
-## 🔧 Si la app no responde (troubleshooting)
+Los seeds solo siembran cuando la BD está **vacía** — los redeploys no
+borran pedidos ni datos reales. Para forzar una resiembra completa:
 
-### La BD está vacía / no hay tablas
-**Problema:** `DATABASE_URL` no está conectada al servicio Web.
-**Solución:** Repite el Paso 4 anterior. Debes ver `DATABASE_URL` en las variables del servicio Web (no solo en el MySQL).
-
-### Error de conexión a MySQL
-**Problema:** El formato de `DATABASE_URL` es incorrecto.
-**Solución:** Debe ser: `mysql://user:password@host:port/database`
-
-### La app arranca pero se ve sin estilos/imagenes
-**Problema:** El build de standalone no copió los assets.
-**Solución:** Re-deploya. Si persiste, verifica que `public/` existe en el repo.
-
----
+```bash
+FORCE_SEED=1 npm run seed:all   # o: bun run db:seed-all
+```
 
 ## 🛠️ Desarrollo local (SQLite)
 
 ```bash
-# Cambiar schema a SQLite
 bash scripts/switch-schema.sh sqlite
 echo "DATABASE_URL=file:./db/custom.db" > .env
 
-# Instalar + setup
 bun install
 bun run db:generate
 bun run db:push
 bun run db:seed-all
 
-# Iniciar
 bun run dev
 ```
 
@@ -98,13 +71,14 @@ bun run dev
 ├── src/lib/              # Auth, DB, utils
 ├── prisma/               # Schema Prisma (MySQL default)
 ├── public/               # Imágenes (WebP)
-├── scripts/              # Seeds y utilidades
+├── scripts/              # Seeds, postbuild y utilidades
 ├── nixpacks.toml         # Config Railway
-└── package.json
+├── DEPLOY-RAILWAY.md     # Guía Railway
+└── DEPLOY-HOSTINGER.md   # Guía Hostinger
 ```
 
 ## 🔧 Stack
 - Next.js 16 + TypeScript 5 + Tailwind CSS 4 + shadcn/ui
 - Prisma ORM (MySQL producción / SQLite desarrollo)
 - Zustand + TanStack Query
-- Bun runtime
+- Bun (Railway) / npm (Hostinger)

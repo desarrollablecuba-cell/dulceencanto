@@ -197,8 +197,10 @@ const siteConfig = {
   phone: '+5351111111',
   whatsappNumber: '+5351111111',
   address: 'Calle Maceo 54, Ciego de Ávila, Cuba',
+  // Zelle activo: pagos en USD desde el exterior (el admin configura el correo
+  // real desde el panel). Quien prefiera, paga localmente desde Cuba en CUP.
   zelleEmail: '',
-  zelleName: '',
+  zelleName: 'Dulce Encanto',
   primaryColor: '#A855F7',
   primaryColorDark: '#7E22CE',
   primaryColorLight: '#F3E8FF',
@@ -231,7 +233,7 @@ const siteConfig = {
     textColor: '#7E22CE',
   }),
   savedThemes: '[]',
-  zelleEnabled: false,
+  zelleEnabled: true,
   freeShippingEnabled: true,
   customerRegistrationEnabled: true,
   customerLoginEnabled: true,
@@ -256,7 +258,7 @@ const siteConfig = {
   asapMaxPerHour: 3,
   asapExcludeNormalHours: false,
   normalSchedule: '09:00 - 18:00',
-  activeCountries: 'CU',
+  activeCountries: 'CU,US',
   tickerItems: JSON.stringify([
     '🧁 ¡Endulza tus momentos especiales! Pedidos con 24h de anticipación.',
     '🎂 Tartas personalizadas para cumpleaños, bodas y eventos.',
@@ -321,20 +323,33 @@ async function main() {
   console.log('  🧁 SEMILLA — Dulce Encanto (repostería boutique)');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // 1. Limpiar tablas (respetando FKs)
-  console.log('🧹 Limpiando tablas...');
-  const tables = [
-    'OrderItem', 'Order',
-    'ProductExtra', 'ProductCombination', 'VariantOption', 'VariantGroup',
-    'WholesaleTier', 'Product',
-    'Review', 'Customer', 'DeliveryZone',
-    'Category', 'SiteConfig', 'Admin',
-  ];
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = OFF;');
-  for (const t of tables) {
-    try { await prisma.$executeRawUnsafe(`DELETE FROM "${t}";`); } catch { /* tabla no existe */ }
+  // Guard de seguridad: si la BD ya fue sembrada, NO borrar nada (evita
+  // perder pedidos reales en cada redeploy de Railway). Forzar con FORCE_SEED=1.
+  const existingAdmins = await prisma.admin.count();
+  if (existingAdmins > 0 && process.env.FORCE_SEED !== '1') {
+    console.log('  ⏭️  La BD ya contiene datos (admins: ' + existingAdmins + ').');
+    console.log('  ⏭️  Seed omitido para NO borrar datos de producción.');
+    console.log('  ⏭️  Para forzar la resiembra completa: FORCE_SEED=1\n');
+    return;
   }
-  await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON;');
+
+  // 1. Limpiar tablas (respetando FKs) — deleteMany funciona en MySQL y SQLite
+  console.log('🧹 Limpiando tablas...');
+  // Orden: primero hijas, luego padres (evita violaciones de FK)
+  await prisma.orderItem.deleteMany({});
+  await prisma.order.deleteMany({});
+  await prisma.productExtra.deleteMany({});
+  await prisma.productCombination.deleteMany({});
+  await prisma.variantOption.deleteMany({});
+  await prisma.variantGroup.deleteMany({});
+  await prisma.wholesaleTier.deleteMany({});
+  await prisma.review.deleteMany({});
+  await prisma.product.deleteMany({});
+  await prisma.customer.deleteMany({});
+  await prisma.deliveryZone.deleteMany({});
+  await prisma.category.deleteMany({});
+  await prisma.siteConfig.deleteMany({});
+  await prisma.admin.deleteMany({});
   console.log('  ✓ Tablas limpiadas\n');
 
   // 2. Categorías

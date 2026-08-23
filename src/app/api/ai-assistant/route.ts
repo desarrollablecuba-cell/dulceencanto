@@ -18,26 +18,28 @@ interface AssistantRequestBody {
   history?: ChatMessage[];
 }
 
-const SYSTEM_PROMPT = `Eres "Diaz IA", el asistente virtual de la tienda online **Diaz Premium Envíos** (https://diaz-premium-envios.com).
+const SYSTEM_PROMPT = `Eres "Dulce IA", el asistente virtual de la tienda online **Dulce Encanto**, repostería artesanal en Ciego de Ávila, Cuba.
 
 ## Tu rol
 - Atiendes a clientes en español neutro / latino, de forma amable, cercana y concisa.
-- Ayudas a encontrar productos, recomendar regalos, resolver dudas sobre envíos, pagos y devoluciones.
-- No inventas información: si no la sabes, dices que vas a derivar al equipo humano.
+- Ayudas a encontrar productos, recomendar dulces para eventos, resolver dudas sobre pedidos, reservas y entregas.
+- No inventas información: si no la sabes, dices que vas a derivar al equipo humano por WhatsApp.
 
 ## Políticas de la tienda (FUENTES DE VERDAD)
-- **Pagos**: solo se acepta Zelle (sin comisiones extras). No se acepta tarjeta ni efectivo por ahora.
-- **Envíos**: los envíos se hacen TODOS LOS DÍAS dentro del horario de atención (15:00 - 18:00). El cliente elige una zona de delivery en el checkout y el costo de envío depende de la zona seleccionada.
-- **Devoluciones**: garantía total, devolución sin preguntas dentro de los 7 días.
-- **Moneda**: todos los precios están en USD.
-- **Cobertura**: se envía principalmente a Ciego de Ávila y provincia, con zonas adicionales para otras provincias. El cliente selecciona la zona al completar los datos de quien recibe.
+- **Moneda**: los precios están en CUP (Peso Cubano). Para quien paga desde el exterior por Zelle, se acepta el equivalente en USD.
+- **Pagos**: DOS opciones:
+  1. **Zelle en USD** — para familiares/amigos que pagan desde el exterior (sin comisiones).
+  2. **Pago local desde Cuba** — en CUP, en efectivo o transferencia, coordinado con la tienda al confirmar el pedido.
+- **Entregas**: a domicilio en Ciego de Ávila (ciudad) y periferia/municipios cercanos. El cliente elige la zona de delivery en el checkout y el costo depende de la zona.
+- **Reservas**: tartas y pasteles personalizados se reservan con al menos 48 horas de anticipación. Los dulces finos y buffet están disponibles para venta directa con 24 horas.
+- **Horario**: lunes a sábado 09:00 - 18:00, domingo cerrado (pedidos online 24/7).
 
 ## Estilo de respuesta
 - Mensajes cortos (máx. 4-6 líneas). Si necesitas listar, usa bullets.
 - Usa emojis con moderación (1 por mensaje como máximo) solo si aporta calidez.
-- Cuando recomiendes productos, menciona nombre + precio. NO inventes productos que no estén en el catálogo.
+- Cuando recomiendes productos, menciona nombre + precio en CUP. NO inventes productos que no estén en el catálogo.
 - Si el cliente pregunta por un producto que no existe, sugiere alternativas reales del catálogo.
-- Si el cliente pregunta por el costo de envío, aclara que depende de la zona de delivery que seleccione al finalizar la compra, y que puede ver las opciones y precios en el paso "Datos de quien recibe".
+- Si el cliente pregunta por el costo de entrega, aclara que depende de la zona de delivery que seleccione al finalizar la compra.
 - Si el cliente quiere comprar, indícale que pulse el botón "Agregar al carrito" y luego "Finalizar compra".
 
 ## Catálogo disponible
@@ -59,7 +61,7 @@ function formatCatalog(products: (Product & { category?: Category | null })[], c
     .slice(0, 60)
     .map(
       (p) =>
-        `- ${p.name} | $${p.price.toFixed(2)} | cat: ${p.category?.slug ?? 'sin-cat'} | rating: ${p.rating}/5 | stock: ${p.stock} | ${p.featured ? 'destacado' : 'normal'}`
+        `- ${p.name} | ₱${p.price.toFixed(2)} CUP | cat: ${p.category?.slug ?? 'sin-cat'} | rating: ${p.rating}/5 | stock: ${p.stock} | ${p.featured ? 'destacado' : 'normal'}`
     )
     .join('\n');
 
@@ -70,7 +72,7 @@ function formatDeliveryZones(zones: DeliveryZone[]): string {
   const active = zones.filter((z) => z.active).sort((a, b) => a.order - b.order);
   if (!active.length) return 'No hay zonas de delivery configuradas.';
   const list = active
-    .map((z) => `- ${z.name} | $${Number(z.price).toFixed(2)} | tiempo estimado: ${z.estimatedTime}`)
+    .map((z) => `- ${z.name} | ₱${Number(z.price).toFixed(2)} CUP | tiempo estimado: ${z.estimatedTime}`)
     .join('\n');
   return `ZONAS DE DELIVERY ACTIVAS (nombre | precio | tiempo estimado):\n${list}`;
 }
@@ -119,8 +121,23 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: userMessage },
     ];
 
-    // 3) Llamar al modelo GLM-5.2 vía z-ai-web-dev-sdk
-    const zai = await ZAI.create();
+    // 3) Llamar al modelo vía z-ai-web-dev-sdk
+    //    Fuera del sandbox de Z.AI (Railway/Hostinger) el SDK no tiene
+    //    credenciales: devolvemos un mensaje de respaldo en vez de un 500
+    //    para que el chat de la tienda no se rompa.
+    let zai: Awaited<ReturnType<typeof ZAI.create>>;
+    try {
+      zai = await ZAI.create();
+    } catch {
+      return NextResponse.json(
+        {
+          ok: true,
+          reply:
+            '¡Hola! 🧁 Nuestro asistente automático no está disponible en este momento, pero puedes escribirnos por WhatsApp y te respondemos enseguida.',
+        },
+        { status: 200 }
+      );
+    }
     const completion = await zai.chat.completions.create({
       messages,
       thinking: { type: 'disabled' },
@@ -154,8 +171,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    name: 'Diaz IA Assistant',
-    model: 'GLM-5.2 (z-ai-web-dev-sdk)',
+    name: 'Dulce IA Assistant',
     endpoint: 'POST /api/ai-assistant',
     body: { message: 'string (required)', history: 'ChatMessage[] (optional)' },
   });
