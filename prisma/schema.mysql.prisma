@@ -310,6 +310,7 @@ model SiteConfig {
   heroTitle                   String  @default("")
   heroSubtitle                String  @default("")
   heroSlides                  String @db.LongText @default("")
+  specialDates                String? @db.LongText
   promoBannerTitle            String  @default("")
   promoBannerSubtitle         String  @default("")
   promoBannerButtonText       String  @default("")

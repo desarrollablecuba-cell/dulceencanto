@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { requireAdmin, unauthorized } from '@/lib/auth';
 
 // Default config devuelto si la BD no tiene SiteConfig todavía.
 // Permite que la UI cargue aunque la migración JSON aún no se haya corrido.
@@ -101,6 +102,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  // Solo el admin puede modificar la configuración del sitio
+  const admin = requireAdmin(request);
+  if (!admin) return unauthorized();
   try {
     const body = await request.json();
     const allowedFields = [
@@ -119,7 +123,7 @@ export async function PUT(request: Request) {
       'scheduleLunes', 'scheduleMartes', 'scheduleMiercoles', 'scheduleJueves',
       'scheduleViernes', 'scheduleSabado', 'scheduleDomingo',
       'asapSurchargeType', 'asapSurchargeValue', 'asapStartHour', 'asapEndHour', 'normalSchedule', 'maxOrderHour', 'asapMinLeadTime', 'asapMaxPerHour', 'asapExcludeNormalHours', 'activeCountries',
-      'tickerItems', 'horarioSectionTitle', 'horarioSectionDesc', 'horarioCards',
+      'tickerItems', 'horarioSectionTitle', 'horarioSectionDesc', 'horarioCards', 'specialDates',
       'socialLinks', 'trustBadges', 'socialStats', 'testimonials', 'homeBenefits', 'howItWorksSteps',
     ];
     const floatFields = ['freeShippingMin', 'shippingCost', 'minOrderAmount', 'asapSurchargeValue'];

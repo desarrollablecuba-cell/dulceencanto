@@ -277,6 +277,7 @@ CREATE TABLE IF NOT EXISTS `SiteConfig` (
     `heroTitle` VARCHAR(191) NOT NULL DEFAULT '',
     `heroSubtitle` VARCHAR(191) NOT NULL DEFAULT '',
     `heroSlides` LONGTEXT NOT NULL DEFAULT (''),
+`specialDates` LONGTEXT,
     `promoBannerTitle` VARCHAR(191) NOT NULL DEFAULT '',
     `promoBannerSubtitle` VARCHAR(191) NOT NULL DEFAULT '',
     `promoBannerButtonText` VARCHAR(191) NOT NULL DEFAULT '',
@@ -458,3 +459,6 @@ ALTER TABLE `OrderItem` ADD CONSTRAINT `OrderItem_orderId_fkey` FOREIGN KEY (`or
 -- AddForeignKey
 ALTER TABLE `EventReservationItem` ADD CONSTRAINT `EventReservationItem_reservationId_fkey` FOREIGN KEY (`reservationId`) REFERENCES `EventReservation`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
+
+-- Columna specialDates (SiteConfig) para despliegues donde la tabla ya existia
+ALTER TABLE `SiteConfig` ADD COLUMN `specialDates` LONGTEXT;

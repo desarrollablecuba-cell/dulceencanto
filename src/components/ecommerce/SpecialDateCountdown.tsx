@@ -34,7 +34,9 @@ interface SpecialDate {
   accent: string;
 }
 
-const SPECIAL_DATES: SpecialDate[] = [
+// Lista por defecto — se usa si el admin no ha configurado fechas propias
+// (editables en el panel admin → Ajustes → Inicio → Fechas Especiales).
+const DEFAULT_SPECIAL_DATES: SpecialDate[] = [
   {
     month: 1, day: 14,  // 14 de febrero
     name: 'Día de San Valentín',
@@ -109,11 +111,11 @@ interface TimeRemaining {
   total: number;
 }
 
-function getNextSpecialDate(now: Date): { date: SpecialDate; targetDate: Date; daysUntil: number } | null {
+function getNextSpecialDate(now: Date, dates: SpecialDate[]): { date: SpecialDate; targetDate: Date; daysUntil: number } | null {
   const currentYear = now.getFullYear();
   let best: { date: SpecialDate; targetDate: Date; daysUntil: number } | null = null;
 
-  for (const sd of SPECIAL_DATES) {
+  for (const sd of dates) {
     // Try current year first
     for (const year of [currentYear, currentYear + 1]) {
       const target = new Date(year, sd.month, sd.day, 0, 0, 0, 0);
@@ -153,6 +155,8 @@ export function SpecialDateCountdown() {
   // `new Date()` después del mount, lo que dispara un re-render con el countdown.
   // Esto es el patrón correcto para componentes que dependen del tiempo real.
   const [now, setNow] = useState<Date | null>(null);
+  // Fechas especiales configuradas por el admin (fallback: lista por defecto)
+  const [dates, setDates] = useState<SpecialDate[]>(DEFAULT_SPECIAL_DATES);
 
   useEffect(() => {
     // Inicializar `now` con la fecha actual y arrancar el timer del reloj.
@@ -164,7 +168,31 @@ export function SpecialDateCountdown() {
     return () => clearInterval(timer);
   }, []);
 
-  const next = useMemo(() => (now ? getNextSpecialDate(now) : null), [now]);
+  // Cargar fechas especiales configuradas desde el admin (SiteConfig.specialDates)
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/siteconfig')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cancelled || !cfg?.specialDates) return;
+        try {
+          const parsed = typeof cfg.specialDates === 'string' ? JSON.parse(cfg.specialDates) : cfg.specialDates;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Validar cada fecha: month 0-11, day 1-31, name presente
+            const valid = parsed.filter(
+              (d: Partial<SpecialDate>) =>
+                d && typeof d.month === 'number' && d.month >= 0 && d.month <= 11 &&
+                typeof d.day === 'number' && d.day >= 1 && d.day <= 31 && !!d.name
+            );
+            if (valid.length > 0) setDates(valid as SpecialDate[]);
+          }
+        } catch { /* config inválida → seguir con defaults */ }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const next = useMemo(() => (now ? getNextSpecialDate(now, dates) : null), [now, dates]);
   const remaining = useMemo(
     () => (next && now ? calculateTimeRemaining(next.targetDate, now) : null),
     [next, now]

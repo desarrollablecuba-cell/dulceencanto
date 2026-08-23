@@ -182,6 +182,17 @@ function AuthForm({ mode, onBack, onSuccess }: AuthFormProps) {
     address: '',
     deliveryZoneId: '',
   });
+  // Teléfono: código de país (dropdown) + número nacional (solo dígitos).
+  // Se combinan al enviar: phoneDial + phoneDigits = "+5351234567".
+  const [phoneDial, setPhoneDial] = useState('+1');
+  const [phoneDigits, setPhoneDigits] = useState('');
+
+  // Reglas de validación del número nacional según el código de país
+  const PHONE_RULES: Record<string, { min: number; max: number; hint: string; validate?: (n: string) => boolean }> = {
+    '+53': { min: 8, max: 8, hint: '8 dígitos, empieza con 5 (ej: 51234567)', validate: (n) => /^5\d{7}$/.test(n) },
+    '+1': { min: 10, max: 10, hint: '10 dígitos (ej: 5551234567)' },
+  };
+  const phoneRule = PHONE_RULES[phoneDial] || { min: 7, max: 15, hint: 'entre 7 y 15 dígitos' };
 
   // Países activos + zonas de delivery (cargados del servidor)
   const [activeCountries, setActiveCountries] = useState<string[]>(['US', 'CU']);
@@ -219,11 +230,30 @@ function AuthForm({ mode, onBack, onSuccess }: AuthFormProps) {
 
   const isCuba = form.country === 'CU';
 
+  // Al cambiar el país del formulario, sincronizar el código telefónico
+  useEffect(() => {
+    const dial = COUNTRY_INFO[form.country]?.dial;
+    if (dial) setPhoneDial(dial);
+  }, [form.country]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRegister) {
-      if (!form.name || !form.phone || !form.email || !form.password) {
+      if (!form.name || !form.email || !form.password) {
         toast({ title: 'Campos requeridos', description: 'Completa todos los campos.', variant: 'destructive' });
+        return;
+      }
+      // Teléfono: dígitos completos y válidos según el país elegido
+      if (!phoneDigits) {
+        toast({ title: 'Teléfono requerido', description: 'Ingresa tu número sin el código de país.', variant: 'destructive' });
+        return;
+      }
+      if (phoneDigits.length < phoneRule.min || phoneDigits.length > phoneRule.max) {
+        toast({ title: 'Teléfono incompleto', description: `Para ${phoneDial} el número debe tener ${phoneRule.hint}.`, variant: 'destructive' });
+        return;
+      }
+      if (phoneRule.validate && !phoneRule.validate(phoneDigits)) {
+        toast({ title: 'Teléfono inválido', description: `Revisa el formato: ${phoneRule.hint}.`, variant: 'destructive' });
         return;
       }
       if (form.password.length < 6) {
@@ -253,7 +283,7 @@ function AuthForm({ mode, onBack, onSuccess }: AuthFormProps) {
       const body = isRegister
         ? {
             name: form.name,
-            phone: form.phone,
+            phone: `${phoneDial}${phoneDigits}`, // completo y validado: +5351234567
             email: form.email,
             password: form.password,
             country: form.country,
@@ -276,7 +306,7 @@ function AuthForm({ mode, onBack, onSuccess }: AuthFormProps) {
       if (isRegister) {
         toast({
           title: '¡Cuenta creada correctamente!',
-          description: `Bienvenido/a a Díaz Premium Envíos, ${data.customer.name}.`,
+          description: `Bienvenido/a a Dulce Encanto, ${data.customer.name}.`,
           duration: 5000,
         });
       }
@@ -355,16 +385,44 @@ function AuthForm({ mode, onBack, onSuccess }: AuthFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-gray-400" /> Teléfono (con código de país)
+                  <Phone className="h-3.5 w-3.5 text-gray-400" /> Teléfono
                 </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder={isCuba ? '+53 5XXX XXXX' : '+1 555 123 4567'}
-                  required
-                />
+                <div className="flex gap-2">
+                  {/* Código de país elegible — garantiza el formato completo */}
+                  <select
+                    aria-label="Código de país"
+                    value={phoneDial}
+                    onChange={(e) => setPhoneDial(e.target.value)}
+                    className="rounded-md border border-gray-300 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-light focus:border-brand shrink-0"
+                  >
+                    {Object.entries(COUNTRY_INFO)
+                      .filter(([, info]) => info.dial)
+                      .map(([code, info]) => (
+                        <option key={code + info.dial} value={info.dial!}>
+                          {code} {info.dial}
+                        </option>
+                      ))}
+                  </select>
+                  {/* Número nacional: solo dígitos, con longitud y formato por país */}
+                  <Input
+                    id="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    value={phoneDigits}
+                    onChange={(e) => {
+                      // Solo dígitos, recortado al máximo del país elegido
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, phoneRule.max);
+                      setPhoneDigits(digits);
+                    }}
+                    placeholder={phoneRule.hint}
+                    required
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500 leading-snug">
+                  Número sin código de país ({phoneRule.hint}). Se guardará como <span className="font-medium">{phoneDial}{phoneDigits || '…'}</span>
+                </p>
               </div>
 
               {/* Campos adicionales para Cuba: dirección + zona */}

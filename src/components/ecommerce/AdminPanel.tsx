@@ -436,6 +436,123 @@ interface Order {
   createdAt: string;
 }
 
+// ─── Fechas Especiales del countdown (editables desde el admin) ─────────────
+const SPECIAL_GRADIENTS = [
+  { id: 'rosa', label: '🌸 Rosa', gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)', accent: '#F472B6' },
+  { id: 'morado', label: '💜 Morado', gradient: 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)', accent: '#C084FC' },
+  { id: 'ambar', label: '🌟 Ámbar', gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', accent: '#FBBF24' },
+  { id: 'azul', label: '💙 Azul', gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', accent: '#60A5FA' },
+  { id: 'rojo', label: '🎄 Rojo', gradient: 'linear-gradient(135deg, #DC2626 0%, #7F1D1D 100%)', accent: '#F87171' },
+  { id: 'cian', label: '🥂 Cian', gradient: 'linear-gradient(135deg, #06B6D4 0%, #0E7490 100%)', accent: '#67E8F9' },
+];
+
+interface SpecialDateRow {
+  name: string; emoji: string; month: number; day: number;
+  description: string; theme: string;
+}
+
+function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  let rows: SpecialDateRow[] = [];
+  try {
+    const parsed = JSON.parse(value || '[]');
+    if (Array.isArray(parsed)) rows = parsed;
+  } catch { /* valor inválido → lista vacía */ }
+  rows = rows.map((r) => ({
+    name: String(r?.name || ''), emoji: String(r?.emoji || '🎉'),
+    month: Number(r?.month) || 0, day: Number(r?.day) || 1,
+    description: String(r?.description || ''), theme: String(r?.theme || 'morado'),
+  }));
+  // Al emitir, resolvemos theme → gradient/accent reales (lo que consume el countdown)
+  const emit = (next: SpecialDateRow[]) =>
+    onChange(
+      JSON.stringify(
+        next.map((r) => {
+          const g = SPECIAL_GRADIENTS.find((x) => x.id === r.theme) || SPECIAL_GRADIENTS[1];
+          return { ...r, gradient: g.gradient, accent: g.accent };
+        })
+      )
+    );
+  const set = (i: number, patch: Partial<SpecialDateRow>) =>
+    emit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  // Fecha ISO auxiliar (año dummy) para el <input type="date">
+  const iso = (r: SpecialDateRow) => `2024-${String(r.month + 1).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
+  const fromIso = (v: string) => {
+    const [y, m, d] = v.split('-').map(Number);
+    if (!m || !d) return null;
+    return { month: m - 1, day: d };
+  };
+
+  return (
+    <div className="space-y-3">
+      {rows.length === 0 && (
+        <p className="text-xs text-gray-500 italic">
+          Sin fechas configuradas — se usa la lista por defecto (San Valentín, Día de las Madres, Fin de Año, etc.).
+        </p>
+      )}
+      {rows.map((r, i) => (
+        <div key={i} className="rounded-lg border border-gray-200 p-3 space-y-2 bg-gray-50/50">
+          <div className="flex gap-2 items-center">
+            <Input
+              value={r.emoji}
+              onChange={(e) => set(i, { emoji: e.target.value.slice(0, 4) })}
+              className="w-14 text-center"
+              aria-label="Emoji"
+            />
+            <Input
+              value={r.name}
+              onChange={(e) => set(i, { name: e.target.value })}
+              placeholder="Nombre (ej: Día de las Madres)"
+              className="flex-1"
+            />
+            <Input
+              type="date"
+              value={iso(r)}
+              onChange={(e) => {
+                const md = fromIso(e.target.value);
+                if (md) set(i, md);
+              }}
+              className="w-40"
+              aria-label="Fecha"
+            />
+            <Button
+              variant="ghost" size="icon" type="button"
+              className="text-red-500 hover:bg-red-50 shrink-0"
+              onClick={() => emit(rows.filter((_, idx) => idx !== i))}
+              aria-label="Eliminar fecha"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={r.description}
+              onChange={(e) => set(i, { description: e.target.value })}
+              placeholder="Descripción corta que se muestra en el banner"
+              className="flex-1"
+            />
+            <select
+              value={r.theme}
+              onChange={(e) => set(i, { theme: e.target.value })}
+              className="rounded-md border border-gray-300 bg-white px-2 text-sm"
+              aria-label="Color del banner"
+            >
+              {SPECIAL_GRADIENTS.map((g) => (
+                <option key={g.id} value={g.id}>{g.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ))}
+      <Button
+        variant="outline" size="sm" type="button"
+        onClick={() => emit([...rows, { name: '', emoji: '🎉', month: 0, day: 1, description: '', theme: 'morado' }])}
+      >
+        <Plus className="h-4 w-4 mr-1" /> Agregar fecha especial
+      </Button>
+    </div>
+  );
+}
+
 interface SiteConfig {
   id: string;
   storeName: string;
@@ -510,6 +627,8 @@ interface SiteConfig {
   heroSubtitle: string;
   /** Slides del hero rotativo (JSON array). */
   heroSlides: string;
+  /** Fechas especiales del countdown (JSON array). Vacío = lista por defecto. */
+  specialDates: string;
   /** Secciones de navegación del header (JSON array). */
   navSections: string;
   /** Items del menú hamburguesa (JSON array). */
@@ -6058,9 +6177,13 @@ function SettingsTab() {
       for (const f of fields) {
         payload[f] = config[f];
       }
+      const token = typeof window !== 'undefined' ? localStorage.getItem('diaz-admin-token') : null;
       const res = await fetch('/api/siteconfig', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -6541,6 +6664,28 @@ function SettingsTab() {
                 onChange={(v) => updateField('homeSectionsOrder', v)}
                 onEnabledChange={(v) => updateField('homeSectionsEnabled', v)}
               />
+            </CardContent>
+          </Card>
+
+          {/* Fechas especiales (countdown del home) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-brand" />
+                Próxima Fecha Especial (Countdown)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-gray-700 -mt-2">
+                Fechas que rota el countdown del home. Solo se muestra la próxima
+                dentro de 60 días. Elige la fecha (mes/día), un emoji, el color del
+                banner y la descripción. Sin fechas = lista por defecto.
+              </p>
+              <SpecialDatesEditor
+                value={config.specialDates || ''}
+                onChange={(v) => updateField('specialDates', v)}
+              />
+              <SaveButton tabKey="specialDates" fields={['specialDates']} />
             </CardContent>
           </Card>
 

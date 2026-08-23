@@ -32,7 +32,7 @@ const now = new Date().toISOString();
 const FORCE = process.env.FORCE_SEED === '1';
 
 // ─── 1. TABLAS ──────────────────────────────────────────────────────────────
-const TOLERABLE = [/already exists/i, /Duplicate (key|index|foreign key)/i, /errno: 105[012]|errno: 1022/i];
+const TOLERABLE = [/already exists/i, /Duplicate (key|index|foreign key|column)/i, /errno: 105[012]|errno: 1022|errno: 1060/i];
 
 async function crearTablas() {
   const sqlPath = path.join(process.cwd(), 'scripts', process.env.DB_DDL_FILE || 'schema-mysql.sql');
