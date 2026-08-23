@@ -83,20 +83,17 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
   });
 }
 
-// ── 2. BD EN PARALELO (tablas + seeds, tolerante a fallos) ─────────────────
-// Camino A: `prisma db push` (CLI). Si el schema engine no está disponible
-//           en el runtime (npm v11+ bloquea postinstall de @prisma/engines),
-//           falla sin crear tablas.
-// Camino B: DDL directo con el PrismaClient de la app (scripts/db-push-raw.mjs)
-//           — usa el motor de CONSULTAS, que siempre funciona porque la web
-//           lo usa. CREATE TABLE IF NOT EXISTS × 19 tablas.
+// ── 2. BD EN PARALELO (tablas + seeds en Node puro, SIN npx/tsx/CLI) ───────
+// Todo el setup (DDL idempotente + 4 bloques de siembra con guards) vive en
+// scripts/db-setup.mjs y usa el PrismaClient de la app — el único mecanismo
+// probado que funciona en el runtime de Railway.
 let dbLista = false;
 const MAX_INTENTOS = 3;
 for (let i = 1; i <= MAX_INTENTOS && !dbLista; i++) {
-  console.log(`\n[db] Camino A — Intento ${i}/${MAX_INTENTOS}: prisma db push...`);
-  if (runSync('npx', ['prisma', 'db', 'push'], 120000)) {
+  console.log(`\n[db] Intento ${i}/${MAX_INTENTOS}: node scripts/db-setup.mjs ...`);
+  if (runSync('node', ['scripts/db-setup.mjs'], 300000)) {
     dbLista = true;
-    console.log('[db] ✓ Tablas verificadas/creadas (prisma db push)');
+    console.log('[db] ✓ Setup de BD completado');
   } else if (i < MAX_INTENTOS) {
     console.log('[db] Falló. Esperando 5s (la app ya está online)...');
     sleepSync(5000);
@@ -104,26 +101,6 @@ for (let i = 1; i <= MAX_INTENTOS && !dbLista; i++) {
 }
 
 if (!dbLista) {
-  console.log('\n[db] Camino B — DDL directo vía PrismaClient (db-push-raw)...');
-  if (runSync('node', ['scripts/db-push-raw.mjs'], 180000)) {
-    dbLista = true;
-    console.log('[db] ✓ Tablas creadas por SQL directo');
-  }
-}
-
-if (!dbLista) {
   console.error('\n[db] ⚠️ No se pudo preparar la BD. La app sigue ARRIBA.');
-  console.error('[db] ⚠️ Revisa DATABASE_URL. Las APIs fallarán hasta arreglarlo.');
-} else {
-  const seeds = ['seed-dulce.ts', 'seed-extras.ts', 'seed-catalog.ts'];
-  for (const s of seeds) {
-    const ruta = `scripts/${s}`;
-    if (!existsSync(ruta)) {
-      console.warn(`[seed] ⚠️ No existe ${ruta} — se omite`);
-      continue;
-    }
-    console.log(`\n[seed] ${s}`);
-    runSync('npx', ['tsx', ruta], 300000); // fallo no tumba la app
-  }
-  console.log('\n[db] ✅ Preparación de BD terminada');
+  console.error('[db] ⚠️ Revisa DATABASE_URL y los logs de [ddl]/[dulce]/[extras]/[catalogo] arriba.');
 }
