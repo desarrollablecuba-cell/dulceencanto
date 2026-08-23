@@ -26,11 +26,15 @@ Y si Railway ignorara las tres capas, la capa 4 es manual e infalible
 (30 segundos, ver Paso 6b): fijar el **Custom Start Command** en el panel.
 
 El script `scripts/start-railway.mjs` al arrancar:
-1. Crea las tablas (`prisma db push`) con reintentos (15 × 5s) esperando a MySQL.
-2. Ejecuta los 3 seeds (solo si la BD está vacía; en redeploys se omiten).
-3. Levanta el servidor Next.js standalone (escucha en el `PORT` de Railway).
+1. **Levanta el servidor Next.js INMEDIATAMENTE** (escucha el puerto en
+   segundos → el healthcheck de Railway pasa al primer intento).
+2. En PARALELO prepara la BD: crea tablas (`prisma db push` con reintentos
+   y timeout por intento) y ejecuta los 3 seeds (solo si la BD está vacía;
+   en redeploys se omiten). Un fallo de BD NO tumba la app: las APIs
+   responden error hasta que la BD quede lista, pero el sitio vive.
 
-Primer arranque: ~1-2 min extra. Siguientes: casi instantáneos.
+Primer arranque: las APIs tardan ~1-2 min en quedar operativas (preparación
+de BD en paralelo). Siguientes: casi instantáneos.
 
 ---
 
