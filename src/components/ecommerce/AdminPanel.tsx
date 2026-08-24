@@ -455,6 +455,21 @@ interface SpecialDateRow {
 
 function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  // Catálogo (para el selector de combos por fecha) — se carga una sola vez
+  const [catalog, setCatalog] = useState<Array<{ id: string; name: string; image: string; price: number }>>([]);
+  useEffect(() => {
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((list) => {
+        if (Array.isArray(list)) {
+          setCatalog(list.map((p: { id: string; name: string; image?: string; price?: number }) => ({
+            id: p.id, name: p.name, image: p.image || '', price: Number(p.price) || 0,
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   let rows: SpecialDateRow[] = [];
   try {
     const parsed = JSON.parse(value || '[]');
@@ -464,16 +479,23 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     name: String(r?.name || ''), emoji: String(r?.emoji || '🎉'),
     month: Number(r?.month) || 0, day: Number(r?.day) || 1,
     description: String(r?.description || ''), theme: String(r?.theme || 'morado'),
+    image: r?.image || undefined,
+    active: r?.active !== false,
+    order: typeof r?.order === 'number' ? r.order : 0,
+    productIds: Array.isArray(r?.productIds) ? r.productIds.map(String) : [],
   }));
   // Si no hay fechas guardadas, partir de la lista por defecto para que el
   // admin pueda EDITARLAS o ELIMINARLAS (ej: quitar el Día de los Padres).
   if (rows.length === 0) {
-    rows = DEFAULT_SPECIAL_DATES.map((d) => ({
+    rows = DEFAULT_SPECIAL_DATES.map((d, i) => ({
       name: d.name, emoji: d.emoji, month: d.month, day: d.day,
       description: d.description, theme: d.theme, image: d.image,
+      active: d.active !== false, order: typeof d.order === 'number' ? d.order : i,
+      productIds: d.productIds || [],
     }));
   }
-  // Al emitir, resolvemos theme → gradient/accent reales (lo que consume el countdown)
+
+  // Al emitir, resolvemos theme → gradient/accent reales (lo que consume la tienda)
   const emit = (next: SpecialDateRow[]) =>
     onChange(
       JSON.stringify(
@@ -485,10 +507,9 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     );
   const set = (i: number, patch: Partial<SpecialDateRow>) =>
     emit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  // Fecha ISO auxiliar (año dummy) para el <input type="date">
   // El año del picker = próxima ocurrencia de esa fecha (si ya pasó este
-  // año, muestra el siguiente → permite elegir 2026, 2027…). Al guardar solo
-  // se conservan mes/día: el countdown siempre calcula la próxima ocurrencia.
+  // año, muestra el siguiente). Al guardar solo se conservan mes/día:
+  // el countdown siempre calcula la próxima ocurrencia.
   const iso = (r: SpecialDateRow) => {
     const hoy = new Date();
     let y = hoy.getFullYear();
@@ -496,21 +517,49 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     return `${y}-${String(r.month + 1).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
   };
   const fromIso = (v: string) => {
-    const [y, m, d] = v.split('-').map(Number);
+    const [, m, d] = v.split('-').map(Number);
     if (!m || !d) return null;
     return { month: m - 1, day: d };
+  };
+  // Mover fila (orden manual: desempata cuando varias fechas coinciden en día)
+  const mover = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = rows.slice();
+    const tmp = next[i].order;
+    next[i] = { ...next[i], order: next[j].order };
+    next[j] = { ...next[j], order: tmp };
+    // Reordenar el array según order para reflejar el movimiento visualmente
+    next.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    emit(next);
   };
 
   return (
     <div className="space-y-3">
       {rows.length === 0 && (
         <p className="text-xs text-gray-500 italic">
-          Sin fechas configuradas — se usa la lista por defecto (San Valentín, Día de las Madres, Fin de Año, etc.).
+          Sin fechas — agrega la primera con el botón de abajo.
         </p>
       )}
       {rows.map((r, i) => (
-        <div key={i} className="rounded-lg border border-gray-200 p-3 space-y-2 bg-gray-50/50">
-          <div className="flex gap-2 items-center">
+        <div key={i} className={`rounded-lg border p-3 space-y-2 bg-gray-50/50 ${r.active === false ? 'opacity-60 border-gray-200' : 'border-brand-light'}`}>
+          <div className="flex gap-2 items-center flex-wrap">
+            {/* Toggle activo: solo las fechas visibles se muestran en la tienda */}
+            <div className="flex flex-col items-center gap-0.5 shrink-0">
+              <Switch checked={r.active !== false} onCheckedChange={(v) => set(i, { active: v })} aria-label="Mostrar en la tienda" />
+              <span className={`text-[10px] font-semibold ${r.active !== false ? 'text-green-600' : 'text-gray-400'}`}>
+                {r.active !== false ? 'Visible' : 'Oculta'}
+              </span>
+            </div>
+            {/* Orden manual (flechas) */}
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <Button variant="ghost" size="icon" type="button" className="h-6 w-6" onClick={() => mover(i, -1)} disabled={i === 0} aria-label="Subir" title="Subir orden">
+                <ChevronUp className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" type="button" className="h-6 w-6" onClick={() => mover(i, 1)} disabled={i === rows.length - 1} aria-label="Bajar" title="Bajar orden">
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </div>
             <Input
               value={r.emoji}
               onChange={(e) => set(i, { emoji: e.target.value.slice(0, 4) })}
@@ -521,7 +570,7 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
               value={r.name}
               onChange={(e) => set(i, { name: e.target.value })}
               placeholder="Nombre (ej: Día de las Madres)"
-              className="flex-1"
+              className="flex-1 min-w-[160px]"
             />
             <Input
               type="date"
@@ -561,7 +610,7 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
             </select>
           </div>
           {/* Imagen de fondo de la tarjeta (opcional, subida al servidor) */}
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50 shrink-0">
               <input
                 type="file"
@@ -605,11 +654,47 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
             )}
             <p className="text-[11px] text-gray-400 leading-snug">Imagen de fondo de la tarjeta (opcional)</p>
           </div>
+          {/* Combos: productos de la tienda agrupados para esta fecha */}
+          <details className="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <summary className="text-xs font-semibold cursor-pointer select-none">
+              🎁 Combos de esta fecha ({r.productIds.length} {r.productIds.length === 1 ? 'producto' : 'productos'})
+            </summary>
+            <div className="mt-2 max-h-56 overflow-y-auto space-y-1">
+              {catalog.length === 0 && <p className="text-xs text-gray-400">Cargando catálogo…</p>}
+              {catalog.map((p) => {
+                const checked = r.productIds.includes(p.id);
+                return (
+                  <label key={p.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        set(i, {
+                          productIds: e.target.checked
+                            ? [...r.productIds, p.id]
+                            : r.productIds.filter((id) => id !== p.id),
+                        })
+                      }
+                      className="accent-pink-600 h-4 w-4"
+                    />
+                    {p.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.image} alt="" className="h-8 w-8 rounded object-cover" />
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-sm">🧁</div>
+                    )}
+                    <span className="text-xs flex-1 truncate">{p.name}</span>
+                    <span className="text-xs text-gray-500 shrink-0">₱{p.price.toLocaleString('es-CU')}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </details>
         </div>
       ))}
       <Button
         variant="outline" size="sm" type="button"
-        onClick={() => emit([...rows, { name: '', emoji: '🎉', month: 0, day: 1, description: '', theme: 'morado' }])}
+        onClick={() => emit([...rows, { name: '', emoji: '🎉', month: 0, day: 1, description: '', theme: 'morado', active: true, order: rows.length, productIds: [] }])}
       >
         <Plus className="h-4 w-4 mr-1" /> Agregar fecha especial
       </Button>
@@ -6741,11 +6826,11 @@ function SettingsTab() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-gray-700 -mt-2">
-                Fechas que rota el countdown del home. Solo se muestra la próxima
-                dentro de 60 días. Se cargan las fechas actuales por defecto para
-                que puedas editarlas o eliminarlas. Puedes elegir fecha del año en
-                curso o el siguiente, subir una imagen de fondo por tarjeta y
-                elegir su color. Guarda los cambios al final.
+                Se muestran TODAS las fechas que dejes ACTIVAS (toggle),
+                ordenadas por la más cercana (las flechas desempatan). Sin límite
+                de días. Cada tarjeta puede tener imagen de fondo y COMBOS:
+                selecciona los productos de la tienda que se mostrarán como
+                ofertas de esa fecha (ej: 6 combos para Fin de Año). Guarda al final.
               </p>
               <SpecialDatesEditor
                 value={config.specialDates || ''}

@@ -48,12 +48,23 @@ export async function POST(request: Request) {
     const timestamp = Date.now();
     const random = randomBytes(6).toString('hex');
     const filename = `prod-${timestamp}-${random}.${ext}`;
-    const uploadDir = resolveUploadDir();
-    await fs.mkdir(uploadDir, { recursive: true });
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const filepath = path.join(uploadDir, filename);
-    await fs.writeFile(filepath, buffer);
+    // Escribir en TODAS las ubicaciones relevantes:
+    //  - /app/.next/standalone/public (de donde el server standalone SIRVE
+    //    los estáticos en producción — puede ser la que lee según el cwd)
+    //  - /app/public (copia del repositorio; también sirve en algunos setups
+    //    y sobrevive al postbuild en redeploys locales/Hostinger)
+    const root = process.cwd();
+    const targetDirs = [path.join(root, 'public', 'products')];
+    const standalonePublic = path.join(root, '.next', 'standalone', 'public');
+    if (existsSync(standalonePublic)) {
+      targetDirs.push(path.join(standalonePublic, 'products'));
+    }
+    for (const dir of targetDirs) {
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path.join(dir, filename), buffer);
+    }
     return NextResponse.json({ path: `/products/${filename}` });
   } catch (error) {
     console.error('[upload] error:', error);
