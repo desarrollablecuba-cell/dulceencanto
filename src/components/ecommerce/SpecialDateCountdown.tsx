@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, Sparkles, ArrowRight } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
+import { DEFAULT_SPECIAL_DATES, type SpecialDate } from '@/lib/special-dates';
 
 /**
  * SpecialDateCountdown
@@ -23,85 +24,6 @@ import { useAppStore } from '@/store/app-store';
  *
  * Lista de fechas especiales (año agnóstico: se calcula el próximo evento):
  */
-
-interface SpecialDate {
-  month: number;  // 0-11 (Jan=0)
-  day: number;    // 1-31
-  name: string;
-  emoji: string;
-  description: string;
-  gradient: string;
-  accent: string;
-}
-
-// Lista por defecto — se usa si el admin no ha configurado fechas propias
-// (editables en el panel admin → Ajustes → Inicio → Fechas Especiales).
-const DEFAULT_SPECIAL_DATES: SpecialDate[] = [
-  {
-    month: 1, day: 14,  // 14 de febrero
-    name: 'Día de San Valentín',
-    emoji: '💖',
-    description: 'Sorprende a tu persona especial con una tarta romántica, cupcakes de corazones y detalles dulces.',
-    gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
-    accent: '#F472B6',
-  },
-  {
-    month: 4, day: 11,  // Segundo domingo de mayo (aproximación: 11 de mayo)
-    name: 'Día de las Madres',
-    emoji: '👩‍👧',
-    description: 'Celebra a mamá con la tarta favorita, un combo de dulces finos y un detalle personalizado.',
-    gradient: 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)',
-    accent: '#C084FC',
-  },
-  {
-    month: 6, day: 15,  // Tercer domingo de julio (aprox)
-    name: 'Día de los Niños',
-    emoji: '🧒',
-    description: 'Tartas temáticas de personajes, máquina de burbujas, decoración colorida. Diversión asegurada.',
-    gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-    accent: '#FBBF24',
-  },
-  {
-    month: 8, day: 8,   // Segundo domingo de septiembre (aprox, Día del Padre en Cuba a veces)
-    name: 'Día de los Padres',
-    emoji: '👨',
-    description: 'Tartas temáticas de fútbol, sublimación de pullovers y detalles para papá.',
-    gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-    accent: '#60A5FA',
-  },
-  {
-    month: 9, day: 10,  // 10 de octubre — Día de la Mujer Cubana
-    name: 'Día de la Mujer Cubana',
-    emoji: '🌹',
-    description: 'Honra a las mujeres de tu vida con postres elegantes, tartas florales y detalles únicos.',
-    gradient: 'linear-gradient(135deg, #F472B6 0%, #DB2777 100%)',
-    accent: '#F9A8D4',
-  },
-  {
-    month: 11, day: 24, // Nochebuena
-    name: 'Nochebuena',
-    emoji: '🎄',
-    description: 'Tartas navideñas, panetelas, galleticas temáticas y combos para celebrar en familia.',
-    gradient: 'linear-gradient(135deg, #DC2626 0%, #7F1D1D 100%)',
-    accent: '#F87171',
-  },
-  {
-    month: 11, day: 31, // Fin de Año
-    name: 'Fin de Año',
-    emoji: '🎉',
-    description: 'Despide el año con estilo: tartas de gala, mesa de dulces completa y promociones especiales.',
-    gradient: 'linear-gradient(135deg, #7E22CE 0%, #2E1065 100%)',
-    accent: '#C084FC',
-  },
-  {
-    month: 0, day: 1,   // Año Nuevo
-    name: 'Año Nuevo',
-    emoji: '🥂',
-    description: 'Recibe el año con postres frescos y tartas personalizadas para empezar con dulzura.',
-    gradient: 'linear-gradient(135deg, #06B6D4 0%, #0E7490 100%)',
-    accent: '#67E8F9',
-  },
-];
 
 interface TimeRemaining {
   days: number;
@@ -222,6 +144,20 @@ export function SpecialDateCountdown() {
           className="relative rounded-3xl overflow-hidden shadow-2xl"
           style={{ background: next.date.gradient }}
         >
+          {/* Imagen de fondo subida por el admin (opcional) */}
+          {next.date.image && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={next.date.image}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                aria-hidden
+              />
+              {/* Velo oscuro para legibilidad del texto sobre la foto */}
+              <div className="absolute inset-0 bg-black/45" aria-hidden />
+            </>
+          )}
           {/* Pattern decorativo */}
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"

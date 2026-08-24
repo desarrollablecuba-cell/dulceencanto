@@ -1,5 +1,7 @@
 'use client';
 
+import { DEFAULT_SPECIAL_DATES } from '@/lib/special-dates';
+
 import { useState, useEffect, useCallback, useRef, Fragment, useMemo } from 'react';
 import { setupFetchInterceptor, sessionManager, tokenManager } from '@/lib/http-client';
 import { Button } from '@/components/ui/button';
@@ -448,10 +450,11 @@ const SPECIAL_GRADIENTS = [
 
 interface SpecialDateRow {
   name: string; emoji: string; month: number; day: number;
-  description: string; theme: string;
+  description: string; theme: string; image?: string;
 }
 
 function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   let rows: SpecialDateRow[] = [];
   try {
     const parsed = JSON.parse(value || '[]');
@@ -462,6 +465,14 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     month: Number(r?.month) || 0, day: Number(r?.day) || 1,
     description: String(r?.description || ''), theme: String(r?.theme || 'morado'),
   }));
+  // Si no hay fechas guardadas, partir de la lista por defecto para que el
+  // admin pueda EDITARLAS o ELIMINARLAS (ej: quitar el Día de los Padres).
+  if (rows.length === 0) {
+    rows = DEFAULT_SPECIAL_DATES.map((d) => ({
+      name: d.name, emoji: d.emoji, month: d.month, day: d.day,
+      description: d.description, theme: d.theme, image: d.image,
+    }));
+  }
   // Al emitir, resolvemos theme → gradient/accent reales (lo que consume el countdown)
   const emit = (next: SpecialDateRow[]) =>
     onChange(
@@ -475,7 +486,15 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
   const set = (i: number, patch: Partial<SpecialDateRow>) =>
     emit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   // Fecha ISO auxiliar (año dummy) para el <input type="date">
-  const iso = (r: SpecialDateRow) => `2024-${String(r.month + 1).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
+  // El año del picker = próxima ocurrencia de esa fecha (si ya pasó este
+  // año, muestra el siguiente → permite elegir 2026, 2027…). Al guardar solo
+  // se conservan mes/día: el countdown siempre calcula la próxima ocurrencia.
+  const iso = (r: SpecialDateRow) => {
+    const hoy = new Date();
+    let y = hoy.getFullYear();
+    if (new Date(y, r.month, r.day, 23, 59, 59) < hoy) y += 1;
+    return `${y}-${String(r.month + 1).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
+  };
   const fromIso = (v: string) => {
     const [y, m, d] = v.split('-').map(Number);
     if (!m || !d) return null;
@@ -540,6 +559,51 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
                 <option key={g.id} value={g.id}>{g.label}</option>
               ))}
             </select>
+          </div>
+          {/* Imagen de fondo de la tarjeta (opcional, subida al servidor) */}
+          <div className="flex gap-2 items-center">
+            <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50 shrink-0">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingIdx(i);
+                  try {
+                    const path = await uploadImage(file, 1200, 0.8);
+                    set(i, { image: path });
+                  } catch {
+                    alert('No se pudo subir la imagen. Intenta de nuevo.');
+                  } finally {
+                    setUploadingIdx(null);
+                    e.target.value = '';
+                  }
+                }}
+              />
+              {uploadingIdx === i ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Subiendo…</>
+              ) : (
+                <><ImagePlus className="h-4 w-4" /> {r.image ? 'Cambiar imagen' : 'Subir imagen'}</>
+              )}
+            </label>
+            {r.image && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.image} alt="" className="h-10 w-20 object-cover rounded border border-gray-300" />
+                <Button
+                  variant="ghost" size="icon" type="button"
+                  className="text-red-500 hover:bg-red-50 h-8 w-8 shrink-0"
+                  onClick={() => set(i, { image: undefined })}
+                  aria-label="Quitar imagen"
+                  title="Quitar imagen"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <p className="text-[11px] text-gray-400 leading-snug">Imagen de fondo de la tarjeta (opcional)</p>
           </div>
         </div>
       ))}
@@ -6678,8 +6742,10 @@ function SettingsTab() {
             <CardContent className="space-y-3">
               <p className="text-xs text-gray-700 -mt-2">
                 Fechas que rota el countdown del home. Solo se muestra la próxima
-                dentro de 60 días. Elige la fecha (mes/día), un emoji, el color del
-                banner y la descripción. Sin fechas = lista por defecto.
+                dentro de 60 días. Se cargan las fechas actuales por defecto para
+                que puedas editarlas o eliminarlas. Puedes elegir fecha del año en
+                curso o el siguiente, subir una imagen de fondo por tarjeta y
+                elegir su color. Guarda los cambios al final.
               </p>
               <SpecialDatesEditor
                 value={config.specialDates || ''}
