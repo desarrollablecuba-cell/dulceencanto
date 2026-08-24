@@ -34,6 +34,54 @@ export function PromotionsSection() {
   const [promos, setPromos] = useState<Promotion[]>([]);
   const [active, setActive] = useState(0);
 
+  // ── Combos por fecha especial (configurados en Ajustes → Inicio) ──
+  interface SpecialDateCfg { month: number; day: number; name: string; emoji: string; description: string; image?: string; accent?: string; gradient?: string; active?: boolean; order?: number; productIds?: string[]; }
+  interface ProductLite { id: string; name: string; price: number; image: string; }
+  const [specialDates, setSpecialDates] = useState<SpecialDateCfg[]>([]);
+  const [products, setProducts] = useState<ProductLite[]>([]);
+
+  useEffect(() => {
+    fetch('/api/siteconfig')
+      .then((r) => r.json())
+      .then((cfg) => {
+        try {
+          const parsed = typeof cfg?.specialDates === 'string' ? JSON.parse(cfg.specialDates) : cfg?.specialDates;
+          if (Array.isArray(parsed)) setSpecialDates(parsed);
+        } catch { /* ignore */ }
+      })
+      .catch(() => {});
+    fetch('/api/products')
+      .then((r) => r.json())
+      .then((list) => {
+        if (Array.isArray(list)) {
+          setProducts(list.map((pr: ProductLite) => ({ id: pr.id, name: pr.name, price: Number(pr.price) || 0, image: pr.image || '' })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Grupos: solo fechas ACTIVAS con combos asignados, ordenadas por próxima
+  // ocurrencia (la más cercana primero — ej: 6 combos para Día de los Padres)
+  const comboGroups = (() => {
+    const now = new Date();
+    return specialDates
+      .filter((d) => d.active !== false && (d.productIds || []).length > 0)
+      .map((d) => {
+        const y = now.getFullYear();
+        const este = new Date(y, d.month, d.day, 0, 0, 0, 0);
+        const target = este.getTime() > now.getTime() ? este : new Date(y + 1, d.month, d.day);
+        return { d, target };
+      })
+      .sort((a, b) => a.target.getTime() - b.target.getTime() || (a.d.order ?? 0) - (b.d.order ?? 0))
+      .map((g) => ({
+        ...g,
+        combos: (g.d.productIds || [])
+          .map((id) => products.find((pr) => pr.id === id))
+          .filter((pr): pr is ProductLite => Boolean(pr)),
+      }))
+      .filter((g) => g.combos.length > 0);
+  })();
+
   useEffect(() => {
     fetch('/api/promotions')
       .then((r) => r.json())
@@ -41,7 +89,7 @@ export function PromotionsSection() {
       .catch(() => {});
   }, []);
 
-  if (promos.length === 0) return null;
+  if (promos.length === 0 && comboGroups.length === 0) return null;
 
   return (
     <section id="promociones" className="py-16 relative" style={{ background: '#FEF7F0' }}>
@@ -59,6 +107,76 @@ export function PromotionsSection() {
           </p>
         </div>
 
+        {/* ── Combos clasificados por fecha especial (del countdown) ── */}
+        {comboGroups.map(({ d, target, combos }) => {
+          const fechaStr = target.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+          return (
+            <div key={`grupo-${d.name}-${d.month}-${d.day}`} className="mb-12">
+              {/* Cabecera del grupo: imagen de fondo (si hay) o gradiente */}
+              <div
+                className="relative overflow-hidden rounded-2xl mb-5 px-5 sm:px-8 py-6"
+                style={{ background: d.gradient || 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)' }}
+              >
+                {d.image && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={d.image} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
+                    <div className="absolute inset-0 bg-black/45" aria-hidden />
+                  </>
+                )}
+                <div className="relative flex items-center gap-4">
+                  <span className="text-4xl drop-shadow-lg">{d.emoji}</span>
+                  <div>
+                    <h3 className="font-bold text-white" style={{ fontSize: '22px', fontFamily: 'Georgia, serif', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                      {d.name}
+                    </h3>
+                    <p className="text-xs font-semibold uppercase tracking-widest mt-0.5" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                      {fechaStr} · {combos.length} {combos.length === 1 ? 'oferta' : 'ofertas'}
+                    </p>
+                  </div>
+                </div>
+                {d.description && (
+                  <p className="relative text-sm mt-2 max-w-2xl" style={{ color: 'rgba(255,255,255,0.92)' }}>
+                    {d.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Combos de la fecha (imágenes reales de los productos) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {combos.map((pr) => (
+                  <div
+                    key={pr.id}
+                    className="group overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1"
+                    style={{ background: '#FFF', border: '1px solid #FBCFE8', boxShadow: '0 6px 20px -4px rgba(236,72,153,0.12)' }}
+                  >
+                    <div className="h-36 overflow-hidden bg-gray-100">
+                      {pr.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={pr.image}
+                          alt={pr.name}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl">🧁</div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug min-h-[2.5rem]">{pr.name}</p>
+                      <p className="mt-1.5 font-bold" style={{ color: '#BE185D' }}>
+                        ₱{pr.price.toLocaleString('es-CU')} CUP
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Grid clásico de promociones (siempre; vacío no renderiza cards) */}
         {/* Grid de promociones */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {promos.map((p, i) => (

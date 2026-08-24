@@ -65,7 +65,9 @@ export async function POST(request: Request) {
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, filename), buffer);
     }
-    return NextResponse.json({ path: `/products/${filename}` });
+    // Ruta servida por /api/uploads (lee del disco por petición — el
+    // servidor standalone no sirve archivos añadidos a public/ tras el boot).
+    return NextResponse.json({ path: `/api/uploads/products/${filename}` });
   } catch (error) {
     console.error('[upload] error:', error);
     return NextResponse.json({ error: 'Error al guardar el archivo' }, { status: 500 });
