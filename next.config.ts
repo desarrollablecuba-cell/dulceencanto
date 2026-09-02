@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Permitir recursos dev desde el dominio de preview del sandbox
+  allowedDevOrigins: ['**.space-z.ai', 'preview-chat-0f2f3481-060b-4bd6-8878-8c15a6f2a434.space-z.ai'],
   images: {
     unoptimized: true,
   },

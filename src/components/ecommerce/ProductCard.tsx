@@ -3,6 +3,7 @@
 import { ShoppingCart, Star, Eye, Heart } from 'lucide-react';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
+import { useCurrencyStore, formatPrice } from '@/store/currency-store';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductTag {
@@ -115,6 +116,7 @@ interface ProductCardProps {
 export function ProductCard({ product }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const selectProduct = useAppStore((s) => s.selectProduct);
+  const currency = useCurrencyStore((s) => s.currency);
   const { toast } = useToast();
 
   const tags = parseTags(product.tags);
@@ -183,7 +185,7 @@ export function ProductCard({ product }: ProductCardProps) {
     setTimeout(() => btn.classList.remove('add-to-cart-pulse'), 600);
     toast({
       title: '✓ Agregado al carrito',
-      description: `${product.name} — $${effectivePrice.toFixed(2)}`,
+      description: `${product.name} — ${formatPrice(effectivePrice, currency)}`,
       duration: 2500,
     });
   };
@@ -349,15 +351,15 @@ export function ProductCard({ product }: ProductCardProps) {
                 className="font-bold"
                 style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}
               >
-                ${(product.offerPrice as number).toFixed(2)}
+                {formatPrice(product.offerPrice as number, currency)}
               </span>
               <span className="text-xs line-through" style={{ color: '#9CA3AF' }}>
-                ${product.price.toFixed(2)}
+                {formatPrice(product.price, currency)}
               </span>
             </div>
           ) : (
             <p className="font-bold" style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
-              ${product.price.toFixed(2)}
+              {formatPrice(product.price, currency)}
             </p>
           )}
         </div>

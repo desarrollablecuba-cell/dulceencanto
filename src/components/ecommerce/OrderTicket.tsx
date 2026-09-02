@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useCurrencyStore, formatPrice } from '@/store/currency-store';
 import { Printer, X, Zap, Clock, Calendar, CheckCircle2, DollarSign } from 'lucide-react';
 
 export interface OrderTicketItem {
@@ -122,7 +123,7 @@ function formatVariantInfo(variantInfo?: string): string {
  * Parsea el JSON de extras de un item y devuelve un string legible.
  * Ejemplo: '[{"name":"Sin queso","price":0.5}]' → 'Sin queso (+$0.50)'
  */
-function formatExtrasInfo(extrasInfo?: string): string {
+function formatExtrasInfo(extrasInfo?: string, currency: 'CUP' | 'USD' = 'CUP'): string {
   if (!extrasInfo) return '';
   try {
     const arr = JSON.parse(extrasInfo);
@@ -131,7 +132,7 @@ function formatExtrasInfo(extrasInfo?: string): string {
       .map((e: { name?: string; price?: number }) => {
         const name = e.name || '';
         const price = Number(e.price) || 0;
-        if (price > 0) return `${name} (+$${price.toFixed(2)})`;
+        if (price > 0) return `${name} (+${formatPrice(price, currency)})`;
         return name;
       })
       .filter(Boolean)
@@ -144,6 +145,7 @@ function formatExtrasInfo(extrasInfo?: string): string {
 export function OrderTicket({ order, open, onOpenChange, onTogglePaid, store }: OrderTicketProps) {
   const [paperSize, setPaperSize] = useState<PaperSize>('80mm');
   const [togglingPaid, setTogglingPaid] = useState(false);
+  const currency = useCurrencyStore((s) => s.currency);
 
   // Reset paper size to 80mm cada vez que se abre
   useEffect(() => {
@@ -376,7 +378,7 @@ export function OrderTicket({ order, open, onOpenChange, onTogglePaid, store }: 
             <div className="font-bold mb-1">PRODUCTOS:</div>
             {order.items.map((item) => {
               const variantText = formatVariantInfo(item.variantInfo);
-              const extrasText = formatExtrasInfo(item.extrasInfo);
+              const extrasText = formatExtrasInfo(item.extrasInfo, currency);
               return (
                 <div key={item.id} className="mb-1">
                   <div className="flex justify-between">
@@ -386,11 +388,11 @@ export function OrderTicket({ order, open, onOpenChange, onTogglePaid, store }: 
                         <span className="text-amber-700 font-bold"> [RESERVADO]</span>
                       )}
                     </span>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    <span>{formatPrice(item.price * item.quantity, currency)}</span>
                   </div>
                   {paperSize === 'letter' && (
                     <div className="text-[12px] text-gray-500">
-                      {item.price.toFixed(2)} c/u
+                      {formatPrice(item.price, currency)} c/u
                     </div>
                   )}
                   {variantText && (
@@ -412,21 +414,21 @@ export function OrderTicket({ order, open, onOpenChange, onTogglePaid, store }: 
           <div className="mb-2">
             <div className="flex justify-between">
               <span>Subtotal:</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>{formatPrice(subtotal, currency)}</span>
             </div>
             <div className="flex justify-between">
               <span>Envío:</span>
-              <span>${order.shippingCost.toFixed(2)}</span>
+              <span>{formatPrice(order.shippingCost, currency)}</span>
             </div>
             {order.deliverySurcharge > 0 && !order.hasReservableItems && (
               <div className="flex justify-between">
                 <span>Costo de Entrega Prioritaria:</span>
-                <span>+${order.deliverySurcharge.toFixed(2)}</span>
+                <span>+{formatPrice(order.deliverySurcharge, currency)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg mt-1 pt-1 border-t border-gray-400">
               <span>TOTAL:</span>
-              <span>${order.total.toFixed(2)}</span>
+              <span>{formatPrice(order.total, currency)}</span>
             </div>
             {!order.isPaid && (
               <div className="mt-2 text-center font-bold border border-gray-400 rounded p-1">

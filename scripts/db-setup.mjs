@@ -242,6 +242,95 @@ async function sembrarCatalogo() {
   console.log(`[catalogo] ✓ ${reservas + directa} productos (${reservas} reservas + ${directa} venta directa)`);
 }
 
+// ─── 6. DULCES FINOS (categoría aparte + 13 productos a 40 USD la docena) ───
+// Idempotente: se aplica en CADA arranque (actualiza precios, crea lo que
+// falte y nunca duplica). Separa "Dulces Finos" (venta directa por docenas)
+// de "Dulces Finos y Buffet" (catálogo general).
+const USD_RATE = 700;
+const usdCup = (n) => Math.round(n * USD_RATE);
+const PRECIO_DOCENA = usdCup(40); // 40 USD la docena = 28000 CUP
+
+const FINOS_CAT_SLUG = 'dulces-finos';
+const FINOS = [
+  ['df-cupcakes', 'Cupcakes', 'Docena de cupcakes artesanales con cobertura de buttercream decorada. Ideales para regalar y celebrar.', '/api/uploads/products/prod-1788326250693-8cd14b2ee035.webp', 'cupcake'],
+  ['df-paletas', 'Paletas', 'Docena de paletas dulces con cobertura de chocolate y decoración colorida, elaboradas a mano.', '/api/uploads/products/prod-1788325966358-df1444c91794.webp', 'paleta'],
+  ['df-cheesecake', 'Cheesecake', 'Docena de cheesecakes cremosos de queso con base de galleta y cobertura de frutas.', '/api/uploads/products/prod-1788326202607-d57297c4fd0b.webp', 'cheesecake'],
+  ['df-cakepops', 'Cakepops', 'Docena de cakepops esponjosos bañados en chocolate y decorados al detalle, perfectos para eventos.', '/api/uploads/products/prod-1788325934165-b7e7bc2d07ba.webp', 'cakepop'],
+  ['df-merenguitos', 'Merenguitos', 'Docena de merenguitos crujientes y ligeros, horneados lentamente para un dulce que se deshace en la boca.', '/products/de/merenguitos-dozen.webp', 'merenguito'],
+  ['df-mini-flanes', 'Mini Flanes', 'Docena de mini flanes con caramelo artesanal, textura suave y sabor casero inolvidable.', '/api/uploads/products/prod-1788326117456-dccef7d8197a.webp', 'flan'],
+  ['df-brownies', 'Brownies', 'Docena de brownies de chocolate intenso, húmedos por dentro y con costra crocante.', '/api/uploads/products/prod-1788326175622-d1802eeed48c.webp', 'brownie'],
+  ['df-tartaletas', 'Tartaletas', 'Docena de tartaletas rellenas con crema y frutas frescas sobre masa quebrada horneada al momento.', '/api/uploads/products/prod-1788326086527-497efb5abff8.webp', 'tartaleta'],
+  ['df-donas', 'Donas', 'Docena de donas esponjosas con glaseados y coberturas de chocolate, virutas y colores surtidos.', '/api/uploads/products/prod-1788326029578-cb494cba2559.webp', 'dona'],
+  ['df-vasos', 'Vasos', 'Docena de vasos dulces en capas: postres cremosos listos para servir en fiestas y reuniones.', '/products/de/de-025-22--vasos-de-tres-leches.webp', 'vasos'],
+  ['df-macarons', 'Macarons', 'Docena de macarons franceses de almendra con rellenos cremosos en colores pasteles.', '/api/uploads/products/prod-1788326057278-ef1ed12775bc.webp', 'macaron'],
+  ['df-pavlovas', 'Pavlovas', 'Docena de pavlovas de merengue crocante con crema batida y frutas frescas de temporada.', '/api/uploads/products/prod-1788325182971-6adfbfd140e1.webp', 'pavlova'],
+  ['df-verrines', 'Verrines', 'Docena de verrines: postres en vaso en capas de mousse, bizcocho y frutas, elegantes listos para servir.', '/api/uploads/products/prod-1788324963605-fef11d9abf39.webp', 'verrine'],
+];
+
+async function sembrarDulcesFinos() {
+  // Categoría: reutilizar la existente (por slug) o crearla nueva
+  let cat = await prisma.category.findUnique({ where: { slug: FINOS_CAT_SLUG } });
+  if (!cat) {
+    cat = await prisma.category.create({
+      data: {
+        id: 'cat-dulces-finos-puros', name: 'Dulces Finos', slug: FINOS_CAT_SLUG,
+        icon: '🍬', image: '/api/uploads/products/prod-1788326250693-8cd14b2ee035.webp',
+        order: 4, active: true, createdAt: now, updatedAt: now,
+      },
+    });
+    console.log('[finos] ✓ Categoría "Dulces Finos" creada');
+  } else {
+    await prisma.category.update({
+      where: { id: cat.id },
+      data: { name: 'Dulces Finos', icon: '🍬', order: 4, active: true, updatedAt: now },
+    });
+  }
+
+  // 13 productos a 40 USD la docena (rescatando equivalentes ya existentes)
+  for (const [id, name, description, image, match] of FINOS) {
+    let target = await prisma.product.findUnique({ where: { id } });
+    if (!target) {
+      const cand = await prisma.product.findMany({
+        where: { categoryId: cat.id, name: { contains: match } }, take: 1,
+      });
+      target = cand[0] ?? null;
+    }
+    const data = {
+      name, description, price: PRECIO_DOCENA, saleUnit: 'docena', categoryId: cat.id,
+      tags: JSON.stringify(['dulces-finos', 'venta-directa']), status: 'active',
+      productType: 'elaborado', posAvailable: true, tiendaAvailable: true,
+      reservationEnabled: false, stock: 50, minHours: 24, advanceType: 'sin', updatedAt: now,
+    };
+    if (target) {
+      // Si ya tiene imagen real subida (/api/uploads/...), conservarla
+      const keepImg = target.image && target.image.startsWith('/api/uploads/products/');
+      await prisma.product.update({ where: { id: target.id }, data: keepImg ? { ...data, image: target.image } : { ...data, image } });
+    } else {
+      await prisma.product.create({
+        data: {
+          id, sku: `DF-${id.replace('df-', '').slice(0, 3).toUpperCase()}`, image,
+          images: '[]', rating: 4.8, reviewCount: 0, featured: false, order: FINOS.findIndex((f) => f[0] === id),
+          barcode: '', minHoursUnit: 'horas', costPrice: 0, marginPercent: 0,
+          offerEnabled: false, offerType: 'permanente', offerPrice: 0,
+          wholesaleEnabled: false, wholesalePrice: 0, wholesaleMinQty: 0,
+          maxReservations: 0, reservationDays: 0, reservationDeposit: 0,
+          promoEnabled: false, promoType: 'discount', promoValue: 0, promoBuyQty: 0, promoGetQty: 0,
+          createdAt: now, ...data,
+        },
+      });
+    }
+  }
+  console.log('[finos] ✓ 13 dulces finos a 40 USD la docena');
+
+  // Precios de pasteles y tortas (siempre se normalizan)
+  const p1 = await prisma.product.updateMany({ where: { categoryId: 'cat-pasteles-dos-pisos' }, data: { price: usdCup(120), updatedAt: now } });
+  const p2 = await prisma.product.updateMany({ where: { categoryId: 'cat-pasteles-tres-pisos' }, data: { price: usdCup(140), updatedAt: now } });
+  const p3 = await prisma.product.updateMany({ where: { name: { contains: 'Torta Sencilla' } }, data: { price: usdCup(30), updatedAt: now } });
+  const p4 = await prisma.product.updateMany({ where: { name: { contains: 'Torta Mediana' } }, data: { price: usdCup(40), updatedAt: now } });
+  const p5 = await prisma.product.updateMany({ where: { name: { contains: 'Torta Alta' } }, data: { price: usdCup(60), updatedAt: now } });
+  console.log(`[precios] ✓ dos pisos(${p1.count}×120USD) tres pisos(${p2.count}×140USD) sencillas(${p3.count}×30USD) medianas(${p4.count}×40USD) altas(${p5.count}×60USD)`);
+}
+
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
 try {
   console.log('═══════════════════════════════════════════════════════');
@@ -252,6 +341,7 @@ try {
   await sembrarSiteConfig();
   await sembrarExtras();
   await sembrarCatalogo();
+  await sembrarDulcesFinos();
   console.log('═══════════════════════════════════════════════════════');
   console.log('  ✅ DB SETUP COMPLETO');
   console.log('═══════════════════════════════════════════════════════');

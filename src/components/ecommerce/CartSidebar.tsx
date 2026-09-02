@@ -2,6 +2,7 @@
 
 import { useCartStore, getCartKey } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
+import { useCurrencyStore, formatPrice } from '@/store/currency-store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -28,7 +29,7 @@ function formatVariantInfo(variantInfo?: string): string {
 /**
  * Parsea el JSON de extras de un item y devuelve un string legible.
  */
-function formatExtrasInfo(extrasInfo?: string): string {
+function formatExtrasInfo(extrasInfo?: string, currency: 'CUP' | 'USD' = 'CUP'): string {
   if (!extrasInfo) return '';
   try {
     const arr = JSON.parse(extrasInfo);
@@ -37,7 +38,7 @@ function formatExtrasInfo(extrasInfo?: string): string {
       .map((e: { name?: string; price?: number }) => {
         const name = e.name || '';
         const price = Number(e.price) || 0;
-        if (price > 0) return `${name} (+$${price.toFixed(2)})`;
+        if (price > 0) return `${name} (+${formatPrice(price, currency)})`;
         return name;
       })
       .filter(Boolean)
@@ -58,6 +59,7 @@ export function CartSidebar() {
   const [siteConfig, setSiteConfig] = useState<SiteConfigData | null>(null);
   const items = useCartStore((s) => s.items);
   const hydrated = useCartStore((s) => s._hydrated);
+  const currency = useCurrencyStore((s) => s.currency);
   const removeItem = useCartStore((s) => s.removeItem);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const getTotal = useCartStore((s) => s.getTotal);
@@ -133,7 +135,7 @@ export function CartSidebar() {
                 // variantes o extras en el carrito.
                 const cartKey = getCartKey(item);
                 const variantText = formatVariantInfo(item.variantInfo);
-                const extrasText = formatExtrasInfo(item.extrasInfo);
+                const extrasText = formatExtrasInfo(item.extrasInfo, currency);
                 return (
                 <div key={cartKey} className="flex gap-3 bg-gray-50 rounded-xl p-4">
                   <div className="w-20 h-20 bg-white rounded-lg overflow-hidden shrink-0 border border-gray-200">
@@ -161,7 +163,7 @@ export function CartSidebar() {
                         <span className="text-gray-400">Extras:</span> {extrasText}
                       </p>
                     )}
-                    <p className="text-sm font-bold text-brand-dark mt-1">${item.price.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-brand-dark mt-1">{formatPrice(item.price, currency)}</p>
                     <div className="flex items-center justify-between mt-auto pt-2">
                       <div className="flex items-center border rounded-md bg-white">
                         <Button
@@ -209,7 +211,7 @@ export function CartSidebar() {
             <div className="space-y-3 pt-4">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">${total.toFixed(2)}</span>
+                <span className="font-medium">{formatPrice(total, currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Envío</span>
@@ -219,13 +221,13 @@ export function CartSidebar() {
               </div>
               {!freeShipping && (
                 <div className="bg-brand-light text-brand-dark text-xs p-3 rounded-lg text-center leading-relaxed">
-                  ¡Agrega ${(freeShippingMin - total).toFixed(2)} más para envío GRATIS!
+                  ¡Agrega {formatPrice(freeShippingMin - total, currency)} más para envío GRATIS!
                 </div>
               )}
               <Separator />
               <div className="flex justify-between text-base font-bold">
                 <span>Subtotal</span>
-                <span className="text-brand-dark">${total.toFixed(2)}</span>
+                <span className="text-brand-dark">{formatPrice(total, currency)}</span>
               </div>
             </div>
 
@@ -234,10 +236,10 @@ export function CartSidebar() {
               {!meetsMinOrder && remainingForMin > 0 && (
                 <div className="w-full rounded-lg bg-amber-50 border border-amber-200 p-3 text-center">
                   <p className="text-sm font-semibold text-amber-800">
-                    🛒 Falta ${remainingForMin.toFixed(2)} para alcanzar el mínimo
+                    🛒 Falta {formatPrice(remainingForMin, currency)} para alcanzar el mínimo
                   </p>
                   <p className="text-xs text-amber-700 mt-0.5">
-                    El monto mínimo de pedido es ${minOrderAmount.toFixed(2)}
+                    El monto mínimo de pedido es {formatPrice(minOrderAmount, currency)}
                   </p>
                 </div>
               )}
@@ -246,7 +248,7 @@ export function CartSidebar() {
                 onClick={handleCheckout}
                 disabled={!meetsMinOrder}
               >
-                {meetsMinOrder ? 'Completar Pedido' : `Faltan $${remainingForMin.toFixed(2)}`}
+                {meetsMinOrder ? 'Completar Pedido' : `Faltan ${formatPrice(remainingForMin, currency)}`}
                 {meetsMinOrder && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
               <Button
