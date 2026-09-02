@@ -1,11 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// PRISMA SCHEMA — Díaz Premium Envíos (SaaS-ready)
+// PRISMA SCHEMA — Dulce Encanto (SQLite para vista previa/sandbox)
 // ═══════════════════════════════════════════════════════════════════════════
-// MySQL — compatible con Hostinger y cualquier hosting con MySQL.
-// Todos los campos JSON (arrays, objetos) se guardan como String (TEXT).
+// MySQL — compatible con Railway y Hostinger.
+// Los campos JSON se guardan como para evitar límites de VARCHAR.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Portabilidad: native (donde se compila) + objetivos comunes de
+  // producción: Railway (Debian) y Hostinger (CloudLinux/RHEL).
 }
 
 datasource db {
@@ -39,8 +41,8 @@ model Product {
   sku       String   @default("")
   price     Float    @default(0)
   image     String   @default("")
-  images    String @default("[]")   // JSON string
-  tags      String @default("[]")   // JSON string
+  images    String @default("[]")
+  tags      String @default("[]")
   categoryId String  @default("")
   rating    Float    @default(0)
   reviewCount Int    @default(0)
@@ -226,8 +228,8 @@ model OrderItem {
   price     Float   @default(0)
   quantity  Int     @default(1)
   image     String  @default("")
-  variantInfo String @default("[]")  // JSON: [{groupName, optionName}]
-  extrasInfo  String @default("[]")  // JSON: [{name, price}]
+  variantInfo String @default("[]")
+  extrasInfo  String @default("[]")
 
   order Order @relation(fields: [orderId], references: [id])
 }
@@ -255,7 +257,7 @@ model Customer {
   address           String
   deliveryZoneId    String?
   deliveryZoneName  String?
-  savedRecipients   String @default("[]")  // JSON string
+  savedRecipients   String @default("[]")
   createdAt         String  @default("")
   updatedAt         String  @default("")
 }
@@ -306,7 +308,8 @@ model SiteConfig {
   cover                       String  @default("")
   heroTitle                   String  @default("")
   heroSubtitle                String  @default("")
-  heroSlides                  String  @default("")
+  heroSlides                  String @default("")
+  specialDates                String?
   promoBannerTitle            String  @default("")
   promoBannerSubtitle         String  @default("")
   promoBannerButtonText       String  @default("")
@@ -366,9 +369,9 @@ model SiteConfig {
   socialStats                 String
   testimonials                String
   homeBenefits                String
-  howItWorksSteps             String  @default("")
-  navSections                 String  @default("")
-  hamburgerItems              String  @default("")
+  howItWorksSteps             String @default("")
+  navSections                 String @default("")
+  hamburgerItems              String @default("")
   createdAt                   String  @default("")
   updatedAt                   String  @default("")
 }
@@ -404,7 +407,7 @@ model EventReservation {
   guestCount      Int     @default(0)
   budget          Float   @default(0)
   paymentMethod   String  @default("")
-  notes           String  @default("")
+  notes           String @default("")
   status          String  @default("pending")
   totalCup        Float   @default(0)
   totalUsd        Float   @default(0)
