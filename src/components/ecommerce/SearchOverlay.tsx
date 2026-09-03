@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Package, Tag, ArrowRight, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice } from '@/store/currency-store';
+import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
 
 interface Product {
   id: string;
@@ -15,7 +15,7 @@ interface Product {
   image: string;
   categoryId: string;
   featured?: boolean;
-  category: { id: string; name: string; slug: string; icon: string };
+  category: { id: string; name: string; slug: string; icon: string; section?: string };
 }
 
 interface Category {
@@ -300,7 +300,7 @@ export function SearchOverlay({ open, onClose, initialQuery = '' }: SearchOverla
                               </p>
                             </div>
                             <span className="font-bold text-sm shrink-0" style={{ color: '#A855F7', fontFamily: 'Georgia, serif' }}>
-                              {formatPrice(p.price, currency)}
+                              {formatPrice(p.price, currencyForProduct(p, currency))}
                             </span>
                             <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: '#EC4899' }} />
                           </button>

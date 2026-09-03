@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight, Star, ShoppingCart, Eye, Flame, Heart } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
 import { useCartStore } from '@/store/cart-store';
-import { useCurrencyStore, formatPrice as formatCurrency } from '@/store/currency-store';
+import { useCurrencyStore, formatPrice as formatCurrency, currencyForProduct } from '@/store/currency-store';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +15,7 @@ interface Category {
   slug: string;
   icon: string;
   image?: string;
+  section?: string;
 }
 
 interface Product {
@@ -76,6 +77,12 @@ export function TopSellingCarousel() {
   const { toast } = useToast();
 
   const formatPrice = useCallback((cup: number) => formatCurrency(cup, currency), [currency]);
+  // REGLA: venta directa siempre en CUP (se paga local); reservas siguen el toggle global.
+  const formatPriceFor = useCallback(
+    (p: { reservationEnabled?: boolean; category?: { section?: string } }, cup: number) =>
+      formatCurrency(cup, currencyForProduct(p, currency)),
+    [currency]
+  );
 
   useEffect(() => {
     fetch('/api/products?featured=true&sort=rating')
@@ -118,7 +125,7 @@ export function TopSellingCarousel() {
     }
     toast({
       title: '✓ Agregado al carrito',
-      description: `${p.shortName || p.name} — ${formatPrice(p.price)}`,
+      description: `${p.shortName || p.name} — ${formatPriceFor(p, p.price)}`,
       duration: 2200,
     });
     window.dispatchEvent(new CustomEvent('toggleCart', { detail: { open: true } }));
@@ -314,12 +321,12 @@ export function TopSellingCarousel() {
                       <div className="mt-auto">
                         {offerActive && (
                           <p className="text-[10px] line-through" style={{ color: '#9CA3AF' }}>
-                            {formatPrice(p.price)}
+                            {formatPriceFor(p, p.price)}
                           </p>
                         )}
                         <div className="flex items-baseline gap-1 mb-2">
                           <span className="font-bold text-base" style={{ color: offerActive ? '#DC2626' : '#2E1065', fontFamily: 'Georgia, serif' }}>
-                            {formatPrice(finalPrice)}
+                            {formatPriceFor(p, finalPrice)}
                           </span>
                         </div>
 

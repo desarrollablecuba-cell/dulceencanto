@@ -155,7 +155,7 @@ export function OrderTicket({ order, open, onOpenChange, onTogglePaid, store }: 
   if (!order) return null;
 
   const subtotal = order.items.reduce((sum, it) => sum + it.price * it.quantity, 0);
-  const storeName = store?.storeName || 'Díaz Premium Envíos';
+  const storeName = store?.storeName || 'Dulce Encanto';
   const storePhone = store?.phone || '';
   const storeAddress = store?.address || '';
   const normalSchedule = store?.normalSchedule || '15:00 - 18:00';

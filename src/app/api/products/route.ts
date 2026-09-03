@@ -61,13 +61,27 @@ export async function GET(request: Request) {
       tiendaAvailable: true,
     };
 
-    // Filtro por tipo de catálogo:
-    // - 'reservation': productos habilitados para reserva (tortas, pasteles, sueños)
-    // - 'immediate': productos de venta directa (dulces finos, buffet)
-    if (catalog === 'reservation') {
-      where.reservationEnabled = true;
-    } else if (catalog === 'immediate') {
-      where.reservationEnabled = false;
+    // Condiciones compuestas (AND de ORs) para no colisionar catálogo + búsqueda
+    const andConditions: Record<string, unknown>[] = [];
+
+    // Filtro por tipo de catálogo — la SECCIÓN de la categoría manda
+    // (configurable desde el admin: Venta Directa / Reservas / Ambas):
+    // - 'reservation': productos de categorías "Por Reserva" + los reservables
+    //   de categorías "Ambas".
+    // - 'immediate': productos de categorías "Venta Directa" + los no
+    //   reservables de categorías "Ambas".
+    if (catalog === 'reservation' || catalog === 'immediate') {
+      const cats = await db.category.findMany({ select: { id: true, section: true } });
+      const inSection = cats.filter((c) => c.section === catalog).map((c) => c.id);
+      const neutral = cats
+        .filter((c) => c.section !== 'immediate' && c.section !== 'reservation')
+        .map((c) => c.id);
+      andConditions.push({
+        OR: [
+          { categoryId: { in: inSection.length > 0 ? inSection : ['__none__'] } },
+          { categoryId: { in: neutral.length > 0 ? neutral : ['__none__'] }, reservationEnabled: catalog === 'reservation' },
+        ],
+      });
     }
 
     if (category) {
@@ -76,10 +90,16 @@ export async function GET(request: Request) {
     }
 
     if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: search } },
+          { description: { contains: search } },
+        ],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     if (featured === 'true') {

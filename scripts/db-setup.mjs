@@ -192,14 +192,14 @@ async function sembrarCatalogo() {
   await prisma.service.deleteMany({ where: { category: 'suenos_sorpresa' } });
 
   const cats = [
-    ['cat-tortas', 'Tortas', 'tortas', '🎂', 0],
-    ['cat-cake-bandeja', 'Cake Tamaño Bandeja', 'cake-bandeja', '🥮', 1],
-    ['cat-pasteles-dos-pisos', 'Pasteles de Dos Pisos', 'pasteles-dos-pisos', '🥧', 2],
-    ['cat-pasteles-tres-pisos', 'Pasteles de Tres Pisos', 'pasteles-tres-pisos', '🎂', 3],
-    ['cat-dulces-finos', 'Dulces Finos y Buffet', 'dulces-finos-buffet', '🧁', 5],
+    ['cat-tortas', 'Tortas', 'tortas', '🎂', 0, 'ambas'],
+    ['cat-cake-bandeja', 'Cake Tamaño Bandeja', 'cake-bandeja', '🥮', 1, 'ambas'],
+    ['cat-pasteles-dos-pisos', 'Pasteles de Dos Pisos', 'pasteles-dos-pisos', '🥧', 2, 'ambas'],
+    ['cat-pasteles-tres-pisos', 'Pasteles de Tres Pisos', 'pasteles-tres-pisos', '🎂', 3, 'ambas'],
+    ['cat-dulces-finos', 'Dulces Finos y Buffet', 'dulces-finos-buffet', '🧁', 5, 'immediate'],
   ];
-  for (const [id, name, slug, icon, order] of cats) {
-    await prisma.category.create({ data: { id, name, slug, icon, image: '', active: true, order, createdAt: now, updatedAt: now } });
+  for (const [id, name, slug, icon, order, section] of cats) {
+    await prisma.category.create({ data: { id, name, slug, icon, image: '', active: true, order, section, createdAt: now, updatedAt: now } });
   }
   const catMap = {
     tortas: ['cat-tortas', true], cake_bandeja: ['cat-cake-bandeja', true],
@@ -275,14 +275,14 @@ async function sembrarDulcesFinos() {
       data: {
         id: 'cat-dulces-finos-puros', name: 'Dulces Finos', slug: FINOS_CAT_SLUG,
         icon: '🍬', image: '/api/uploads/products/prod-1788326250693-8cd14b2ee035.webp',
-        order: 4, active: true, createdAt: now, updatedAt: now,
+        order: 4, active: true, section: 'reservation', createdAt: now, updatedAt: now,
       },
     });
-    console.log('[finos] ✓ Categoría "Dulces Finos" creada');
+    console.log('[finos] ✓ Categoría "Dulces Finos" creada (sección: Por Reserva)');
   } else {
     await prisma.category.update({
       where: { id: cat.id },
-      data: { name: 'Dulces Finos', icon: '🍬', order: 4, active: true, updatedAt: now },
+      data: { name: 'Dulces Finos', icon: '🍬', order: 4, active: true, section: 'reservation', updatedAt: now },
     });
   }
 
@@ -297,9 +297,9 @@ async function sembrarDulcesFinos() {
     }
     const data = {
       name, description, price: PRECIO_DOCENA, saleUnit: 'docena', categoryId: cat.id,
-      tags: JSON.stringify(['dulces-finos', 'venta-directa']), status: 'active',
+      tags: JSON.stringify(['dulces-finos', 'por-reserva']), status: 'active',
       productType: 'elaborado', posAvailable: true, tiendaAvailable: true,
-      reservationEnabled: false, stock: 50, minHours: 24, advanceType: 'sin', updatedAt: now,
+      reservationEnabled: true, stock: 50, minHours: 24, advanceType: 'sin', updatedAt: now,
     };
     if (target) {
       // Si ya tiene imagen real subida (/api/uploads/...), conservarla
@@ -320,7 +320,7 @@ async function sembrarDulcesFinos() {
       });
     }
   }
-  console.log('[finos] ✓ 13 dulces finos a 40 USD la docena');
+  console.log('[finos] ✓ 13 dulces finos a 40 USD la docena (sección: Por Reserva)');
 
   // Precios de pasteles y tortas (siempre se normalizan)
   const p1 = await prisma.product.updateMany({ where: { categoryId: 'cat-pasteles-dos-pisos' }, data: { price: usdCup(120), updatedAt: now } });
@@ -329,6 +329,28 @@ async function sembrarDulcesFinos() {
   const p4 = await prisma.product.updateMany({ where: { name: { contains: 'Torta Mediana' } }, data: { price: usdCup(40), updatedAt: now } });
   const p5 = await prisma.product.updateMany({ where: { name: { contains: 'Torta Alta' } }, data: { price: usdCup(60), updatedAt: now } });
   console.log(`[precios] ✓ dos pisos(${p1.count}×120USD) tres pisos(${p2.count}×140USD) sencillas(${p3.count}×30USD) medianas(${p4.count}×40USD) altas(${p5.count}×60USD)`);
+}
+
+// ─── 7. IMÁGENES DE CATEGORÍAS DESTACADAS ────────────────────────────────
+// Cada categoría destacada muestra como imagen la foto REAL de uno de los
+// productos que contiene (la del primer producto activo). Idempotente: solo
+// rellena las que NO tienen imagen (no pisa imágenes subidas por el admin).
+async function sembrarImagenesCategorias() {
+  const cats = await prisma.category.findMany({
+    include: { products: { orderBy: { order: 'asc' }, take: 20, select: { image: true, status: true } } },
+  });
+  let actualizadas = 0;
+  for (const cat of cats) {
+    if (cat.image && cat.image.trim() !== '') continue; // ya tiene imagen
+    const real = cat.products.find((p) => p.image && p.image.trim() !== '');
+    if (!real) continue;
+    await prisma.category.update({
+      where: { id: cat.id },
+      data: { image: real.image, updatedAt: now },
+    });
+    actualizadas++;
+  }
+  console.log(`[categorias-img] ✓ ${actualizadas} categorías con imagen de un producto real`);
 }
 
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
@@ -342,6 +364,7 @@ try {
   await sembrarExtras();
   await sembrarCatalogo();
   await sembrarDulcesFinos();
+  await sembrarImagenesCategorias();
   console.log('═══════════════════════════════════════════════════════');
   console.log('  ✅ DB SETUP COMPLETO');
   console.log('═══════════════════════════════════════════════════════');

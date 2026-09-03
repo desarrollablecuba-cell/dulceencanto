@@ -3,7 +3,7 @@
 import { ShoppingCart, Star, Eye, Heart } from 'lucide-react';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice } from '@/store/currency-store';
+import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductTag {
@@ -38,6 +38,7 @@ interface Product {
     slug: string;
     icon: string;
     image?: string;
+    section?: string;
   };
   /**
    * Indica si el producto tiene grupos de variantes (VariantGroup).
@@ -118,6 +119,9 @@ export function ProductCard({ product }: ProductCardProps) {
   const selectProduct = useAppStore((s) => s.selectProduct);
   const currency = useCurrencyStore((s) => s.currency);
   const { toast } = useToast();
+  // REGLA: los productos de VENTA DIRECTA (buffet, dulces sueltos) se muestran
+  // SIEMPRE en CUP — se pagan localmente. El resto sigue al toggle global.
+  const displayCurrency = currencyForProduct(product, currency);
 
   const tags = parseTags(product.tags);
   const offerActive = isOfferActive(product);
@@ -185,7 +189,7 @@ export function ProductCard({ product }: ProductCardProps) {
     setTimeout(() => btn.classList.remove('add-to-cart-pulse'), 600);
     toast({
       title: '✓ Agregado al carrito',
-      description: `${product.name} — ${formatPrice(effectivePrice, currency)}`,
+      description: `${product.name} — ${formatPrice(effectivePrice, displayCurrency)}`,
       duration: 2500,
     });
   };
@@ -351,15 +355,15 @@ export function ProductCard({ product }: ProductCardProps) {
                 className="font-bold"
                 style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}
               >
-                {formatPrice(product.offerPrice as number, currency)}
+                {formatPrice(product.offerPrice as number, displayCurrency)}
               </span>
               <span className="text-xs line-through" style={{ color: '#9CA3AF' }}>
-                {formatPrice(product.price, currency)}
+                {formatPrice(product.price, displayCurrency)}
               </span>
             </div>
           ) : (
             <p className="font-bold" style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
-              {formatPrice(product.price, currency)}
+              {formatPrice(product.price, displayCurrency)}
             </p>
           )}
         </div>

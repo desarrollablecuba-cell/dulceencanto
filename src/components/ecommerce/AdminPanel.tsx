@@ -279,6 +279,9 @@ interface Category {
   icon: string;
   image?: string;
   order: number;
+  /** Sección donde aparece: 'ambas' | 'immediate' | 'reservation' */
+  section?: string;
+  active?: boolean;
   _count?: { products: number };
   createdAt: string;
 }
@@ -3954,9 +3957,33 @@ function CategoriesTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({ name: '', slug: '', icon: '📦', image: '', order: 0 });
+  const [form, setForm] = useState({ name: '', slug: '', icon: '📦', image: '', order: 0, section: 'ambas' });
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /** Etiquetas de sección — dónde aparece la categoría en la tienda. */
+  const SECTION_OPTIONS = [
+    { value: 'ambas', label: 'Ambas secciones', short: 'Ambas' },
+    { value: 'immediate', label: '🛒 Venta Directa', short: '🛒 Directa' },
+    { value: 'reservation', label: '📅 Por Reserva', short: '📅 Reserva' },
+  ] as const;
+
+  /** Cambia la sección de una categoría al vuelo (desde la tabla). */
+  const changeSection = async (c: Category, section: string) => {
+    // Actualización optimista + guardado
+    setCategories((cur) => cur.map((x) => (x.id === c.id ? { ...x, section } : x)));
+    try {
+      await fetch(`/api/admin/categories/${c.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section }),
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      fetchData();
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -3975,13 +4002,13 @@ function CategoriesTab() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', slug: '', icon: '📦', image: '', order: 0 });
+    setForm({ name: '', slug: '', icon: '📦', image: '', order: 0, section: 'ambas' });
     setDialogOpen(true);
   };
 
   const openEdit = (c: Category) => {
     setEditing(c);
-    setForm({ name: c.name, slug: c.slug, icon: c.icon, image: c.image ?? '', order: c.order });
+    setForm({ name: c.name, slug: c.slug, icon: c.icon, image: c.image ?? '', order: c.order, section: c.section || 'ambas' });
     setDialogOpen(true);
   };
 
@@ -4157,6 +4184,7 @@ function CategoriesTab() {
                 <TableHead className="w-20">Imagen</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Slug</TableHead>
+                <TableHead>Sección</TableHead>
                 <TableHead>Productos</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -4185,6 +4213,19 @@ function CategoriesTab() {
                     </TableCell>
                     <TableCell className="text-gray-700 font-mono text-sm">{c.slug}</TableCell>
                     <TableCell>
+                        {/* Mover la categoría de sección al vuelo: Venta Directa / Reservas / Ambas */}
+                        <select
+                          value={c.section || 'ambas'}
+                          onChange={(e) => changeSection(c, e.target.value)}
+                          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-800 hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200 cursor-pointer"
+                          title="Sección de la tienda donde aparece esta categoría"
+                        >
+                          {SECTION_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="secondary">{c._count?.products ?? 0}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -4194,7 +4235,7 @@ function CategoriesTab() {
                           type="button"
                           onClick={() => {
                             setEditing(c);
-                            setForm({ name: c.name, slug: c.slug, icon: c.icon, image: c.image ?? '', order: c.order });
+                            setForm({ name: c.name, slug: c.slug, icon: c.icon, image: c.image ?? '', order: c.order, section: c.section || 'ambas' });
                             setTimeout(() => fileInputRef.current?.click(), 100);
                           }}
                           title="Subir imagen"
@@ -4350,6 +4391,21 @@ function CategoriesTab() {
                 <Label>Orden</Label>
                 <Input type="number" value={form.order} onChange={(e) => setForm({ ...form, order: parseInt(e.target.value) || 0 })} />
               </div>
+            </div>
+            <div>
+              <Label>Sección de la tienda</Label>
+              <select
+                value={form.section}
+                onChange={(e) => setForm({ ...form, section: e.target.value })}
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-200"
+              >
+                {SECTION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-700 mt-1">
+                Define dónde aparece la categoría: en Venta Directa (se paga en CUP), en Reservas / Por Encargo, o en ambas. Ej: los Dulces Finos van en “Por Reserva”.
+              </p>
             </div>
           </div>
           <DialogFooter>

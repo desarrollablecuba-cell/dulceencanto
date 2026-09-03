@@ -112,12 +112,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="max-w-[1600px] mx-auto">
-        {/* Top bar */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        {/* Top bar — compacta en móvil */}
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3">
           {/* Hamburger — SIEMPRE visible (contiene items de utilidad) */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105"
             style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)', color: '#FFF', boxShadow: '0 4px 12px rgba(168,85,247,0.3)' }}
             aria-label="Abrir menú"
           >
@@ -130,9 +130,9 @@ export function Header() {
             onClick={() => { setView('home'); setSearchQuery(''); setSearchValue(''); }}
           >
             {logoUrl ? (
-              <img src={logoUrl} alt={storeName} className="w-10 h-10 rounded-xl object-cover" />
+              <img src={logoUrl} alt={storeName} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover" />
             ) : (
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md" style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }} aria-hidden>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md" style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }} aria-hidden>
                 {storeName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -194,7 +194,7 @@ export function Header() {
             <Search className="h-5 w-5" style={{ color: '#7E22CE' }} />
           </button>
 
-          {/* Currency toggle — global (afecta a toda la tienda) */}
+          {/* Currency toggle — global (afecta a toda la tienda). Compacto en móvil */}
           <div
             className="shrink-0 flex items-center gap-0.5 p-0.5 rounded-full cursor-pointer select-none transition-all hover:shadow-md"
             style={{ background: 'linear-gradient(135deg, #F3E8FF 0%, #FCE7F3 100%)', border: '1px solid #FBCFE8' }}
@@ -211,7 +211,7 @@ export function Header() {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setCurrency('CUP'); }}
-              className="px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all"
+              className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all"
               style={{
                 background: currency === 'CUP' ? 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)' : 'transparent',
                 color: currency === 'CUP' ? '#FFF' : '#7E22CE',
@@ -225,7 +225,7 @@ export function Header() {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setCurrency('USD'); }}
-              className="px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all"
+              className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all"
               style={{
                 background: currency === 'USD' ? 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)' : 'transparent',
                 color: currency === 'USD' ? '#FFF' : '#BE185D',
@@ -302,21 +302,9 @@ export function Header() {
           </div>
         </div>
 
-        {/* Mobile search */}
-        <form onSubmit={handleSearch} className="sm:hidden px-4 pb-3">
-          <div className="flex">
-            <Input
-              type="text"
-              placeholder="Buscar productos..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              className="rounded-r-none border-r-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
-            />
-            <Button type="submit" className="rounded-l-none bg-brand hover:bg-brand-dark h-10 px-6">
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-        </form>
+        {/* Búsqueda móvil: se abre con el botón compacto de la barra superior
+            (SearchOverlay). Se eliminó el formulario duplicado que ocupaba una
+            fila entera y empujaba todo el contenido hacia abajo. */}
 
         {/* Mobile menu — Enhanced animated drawer */}
         <AnimatePresence>
@@ -341,7 +329,7 @@ export function Header() {
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 280 }}
                 className="fixed top-0 left-0 bottom-0 z-50 w-[85%] max-w-sm overflow-y-auto"
-                style={{ background: 'linear-gradient(180deg, #2E1065 0%, #4C1D95 100%)' }}
+                style={{ background: 'linear-gradient(180deg, #2E1065 0%, #4C1D95 100%)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
               >
                 {/* Drawer header */}
                 <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(236,72,153,0.2)' }}>

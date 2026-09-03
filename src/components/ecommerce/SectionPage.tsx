@@ -24,8 +24,8 @@ export function SectionPage({ title, subtitle, icon, children, bannerImage }: Se
   const { setView } = useAppStore();
   return (
     <div>
-      {/* Banner de la sección con imagen de fondo */}
-      <section className="relative overflow-hidden" style={{ minHeight: '240px' }}>
+      {/* Banner de la sección con imagen de fondo — altura compacta en móvil */}
+      <section className="relative overflow-hidden" style={{ minHeight: '180px' }}>
         {bannerImage && (
           <img
             src={bannerImage}
@@ -34,10 +34,10 @@ export function SectionPage({ title, subtitle, icon, children, bannerImage }: Se
           />
         )}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(46,16,101,0.88) 0%, rgba(126,34,206,0.75) 50%, rgba(168,85,247,0.6) 100%)' }} />
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-10 md:py-14 relative z-10">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-7 sm:py-10 md:py-14 relative z-10">
           <button
             onClick={() => setView('home')}
-            className="inline-flex items-center gap-1.5 text-sm font-medium mb-4 transition-opacity hover:opacity-80"
+            className="inline-flex items-center gap-1.5 text-sm font-medium mb-3 sm:mb-4 transition-opacity hover:opacity-80"
             style={{ color: '#E9D5FF' }}
           >
             <ChevronLeft className="h-4 w-4" /> Volver al inicio
@@ -46,15 +46,15 @@ export function SectionPage({ title, subtitle, icon, children, bannerImage }: Se
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="flex items-center gap-4"
+            className="flex items-center gap-3 sm:gap-4"
           >
-            <span style={{ fontSize: '48px' }}>{icon}</span>
-            <div>
-              <h1 className="font-bold text-white" style={{ fontSize: '32px', fontFamily: 'Georgia, serif' }}>
+            <span className="text-3xl sm:text-5xl">{icon}</span>
+            <div className="min-w-0">
+              <h1 className="font-bold text-white leading-tight text-2xl sm:text-3xl md:text-[32px]" style={{ fontFamily: 'Georgia, serif' }}>
                 {title}
               </h1>
               {subtitle && (
-                <p className="mt-1 max-w-2xl" style={{ fontSize: '15px', color: '#E9D5FF' }}>
+                <p className="mt-1 max-w-2xl text-[13px] sm:text-[15px]" style={{ color: '#E9D5FF' }}>
                   {subtitle}
                 </p>
               )}

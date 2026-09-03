@@ -8,6 +8,7 @@ CREATE TABLE `Category` (
     `image` LONGTEXT NOT NULL,
     `order` INTEGER NOT NULL DEFAULT 0,
     `active` BOOLEAN NOT NULL DEFAULT true,
+    `section` VARCHAR(191) NOT NULL DEFAULT 'ambas',
     `createdAt` VARCHAR(191) NOT NULL DEFAULT '',
     `updatedAt` VARCHAR(191) NOT NULL DEFAULT '',
 

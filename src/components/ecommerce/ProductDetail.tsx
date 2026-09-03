@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useCartStore } from '@/store/cart-store';
+import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -20,6 +21,7 @@ interface Category {
   slug: string;
   icon: string;
   image?: string;
+  section?: string;
 }
 
 interface ProductTag {
@@ -393,6 +395,11 @@ export function ProductDetail() {
 
   const offerActive = product ? isOfferActive(product) : false;
   const basePrice = product ? (offerActive ? (product.offerPrice as number) : product.price) : 0;
+  // REGLA DE MONEDA: todos los precios por defecto en USD, PERO los productos
+  // de venta directa (buffet, dulces sueltos) se muestran siempre en CUP.
+  const globalCurrency = useCurrencyStore((st) => st.currency);
+  const displayCurrency = product ? currencyForProduct(product, globalCurrency) : globalCurrency;
+  const fmt = (cup: number) => formatPrice(cup, displayCurrency);
 
   // Suma de priceMods de opciones seleccionadas
   const optionsPriceMod = useMemo(() => {
@@ -922,15 +929,15 @@ export function ProductDetail() {
           <div className="flex items-end gap-3 flex-wrap">
             {offerActive ? (
               <>
-                <span className="text-3xl font-bold text-brand-dark">${(product.offerPrice as number).toFixed(2)}</span>
-                <span className="text-lg text-gray-400 line-through">${product.price.toFixed(2)}</span>
+                <span className="text-3xl font-bold text-brand-dark">{fmt(product.offerPrice as number)}</span>
+                <span className="text-lg text-gray-400 line-through">{fmt(product.price)}</span>
                 <Badge className="bg-brand-light text-brand-dark text-xs">
-                  Ahorras ${(product.price - (product.offerPrice as number)).toFixed(2)}
+                  Ahorras {fmt(product.price - (product.offerPrice as number))}
                 </Badge>
               </>
             ) : (
               <>
-                <span className="text-3xl font-bold text-gray-900">${product.price.toFixed(2)}</span>
+                <span className="text-3xl font-bold text-gray-900">{fmt(product.price)}</span>
               </>
             )}
           </div>
@@ -939,7 +946,7 @@ export function ProductDetail() {
           {(optionsPriceMod > 0 || extrasPriceMod > 0) && (
             <div className="p-3 bg-brand-light border border-brand-light rounded-lg">
               <p className="text-sm text-brand-dark">
-                Precio total con variantes/extras: <strong>${effectivePrice.toFixed(2)}</strong>
+                Precio total con variantes/extras: <strong>{fmt(effectivePrice)}</strong>
               </p>
             </div>
           )}
@@ -976,7 +983,7 @@ export function ProductDetail() {
                                 <td className="py-1.5 pr-3 font-medium text-emerald-900">{t.name || '—'}</td>
                                 <td className="py-1.5 pr-3 text-emerald-800">{fmtQty(t)}</td>
                                 <td className="py-1.5 pr-3 text-right font-bold text-emerald-900">
-                                  ${Number(t.price ?? 0).toFixed(2)}
+                                  {fmt(Number(t.price ?? 0))}
                                 </td>
                               </tr>
                             ))}
@@ -985,7 +992,7 @@ export function ProductDetail() {
                       </div>
                     ) : (
                       <p className="text-xs text-emerald-700">
-                        Precio al por mayor: ${(product.wholesalePrice ?? 0).toFixed(2)} · Mínimo {product.wholesaleMinQty ?? 1} unidades
+                        Precio al por mayor: {fmt(product.wholesalePrice ?? 0)} · Mínimo {product.wholesaleMinQty ?? 1} unidades
                       </p>
                     )}
                   </div>
@@ -1060,10 +1067,10 @@ export function ProductDetail() {
                           )}
                           <span className="font-medium">{o.name}</span>
                           {o.priceMod > 0 && (
-                            <span className="text-xs text-gray-500">+${o.priceMod.toFixed(2)}</span>
+                            <span className="text-xs text-gray-500">+{fmt(o.priceMod)}</span>
                           )}
                           {o.priceMod < 0 && (
-                            <span className="text-xs text-green-600">${o.priceMod.toFixed(2)}</span>
+                            <span className="text-xs text-green-600">{fmt(o.priceMod)}</span>
                           )}
                           {/* Etiqueta de stock por opción */}
                           {optionOutOfStock && optionIsReservable && (
@@ -1116,7 +1123,7 @@ export function ProductDetail() {
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-gray-900">{e.name}</span>
                           <span className="text-sm font-semibold text-brand-dark whitespace-nowrap">
-                            +${e.priceMod.toFixed(2)}
+                            +{fmt(e.priceMod)}
                           </span>
                         </div>
                         {e.description && (
@@ -1229,7 +1236,7 @@ export function ProductDetail() {
                 ) : (
                   <>
                     <ShoppingCart className="mr-2 h-5 w-5" />
-                    Reservar — ${(effectivePrice * quantity).toFixed(2)}
+                    Reservar — {fmt(effectivePrice * quantity)}
                   </>
                 )}
               </Button>
@@ -1240,7 +1247,7 @@ export function ProductDetail() {
                 onClick={() => handleAddToCart(false)}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Agregar al Carrito — ${(effectivePrice * quantity).toFixed(2)}
+                Agregar al Carrito — {fmt(effectivePrice * quantity)}
               </Button>
             </div>
           ) : (
@@ -1264,8 +1271,8 @@ export function ProductDetail() {
                 <>
                   <ShoppingCart className="mr-2 h-5 w-5" />
                   {isReservable
-                    ? `Reservar — ${(effectivePrice * quantity).toFixed(2)}`
-                    : `Agregar al Carrito — ${(effectivePrice * quantity).toFixed(2)}`}
+                    ? `Reservar — ${fmt(effectivePrice * quantity)}`
+                    : `Agregar al Carrito — ${fmt(effectivePrice * quantity)}`}
                 </>
               )}
             </Button>

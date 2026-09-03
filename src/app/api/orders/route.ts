@@ -279,7 +279,9 @@ export async function POST(request: Request) {
 
     const total = subtotal + shipping + surcharge;
 
-    const orderNumber = `DPE-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    // Prefijo del vale: DE = Dulce Encanto (antes decia "DPE" y se cambio a
+    // peticion del cliente para que el vale identifique a la tienda).
+    const orderNumber = `DE-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const order = await db.order.create({
       data: {

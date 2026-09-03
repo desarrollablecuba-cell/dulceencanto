@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { BrandThemeApplier } from "@/components/ecommerce/BrandTheme";
 import { PWAInstallPrompt } from "@/components/ecommerce/PWAInstallPrompt";
+import { ServiceWorkerCleaner } from "@/components/ServiceWorkerCleaner";
 
 // Inter se sirve autohospedada vía @fontsource (familia CSS "Inter");
 // la variable --font-inter se define en globals.css.
@@ -26,7 +27,8 @@ export const metadata: Metadata = {
   authors: [{ name: "Dulce Encanto" }],
   icons: {
     icon: "/favicon.webp",
-    apple: "/favicon.webp",
+    shortcut: "/favicon.webp",
+    apple: "/apple-touch-icon.webp",
   },
   manifest: "/manifest.json",
   appleWebApp: {
@@ -66,24 +68,10 @@ export default function RootLayout({
             radios, sombras, footer) desde la configuración del admin.
             Sin render visual. */}
         <BrandThemeApplier />
-        {/* Force-unregister old service workers that cache stale admin pages */}
-        <script dangerouslySetInnerHTML={{ __html: `
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              regs.forEach(function(reg) {
-                if (reg.active && reg.active.scriptURL.indexOf('sw.js') !== -1) {
-                  var swVersion = reg.active.scriptURL;
-                  // Unregister any SW that isn't v2 (the current version)
-                  reg.unregister();
-                }
-              });
-              // Also clear all caches
-              if (window.caches) {
-                caches.keys().then(function(names) { names.forEach(function(n) { caches.delete(n); }); });
-              }
-            });
-          }
-        `}} />
+        {/* Force-unregister old service workers that cache stale admin pages.
+            NOTA: la lógica vive en un componente cliente — React no ejecuta
+            etiquetas <script> renderizadas dentro de componentes. */}
+        <ServiceWorkerCleaner />
         {children}
         <Toaster />
         <SonnerToaster position="top-right" richColors closeButton />

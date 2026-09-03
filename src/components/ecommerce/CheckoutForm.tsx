@@ -990,6 +990,11 @@ export function CheckoutForm() {
       line += ` x${i.quantity} = ${formatPrice(i.price * i.quantity, currency)}`;
       return line;
     }).join('\n');
+    // Totales del vale: CUP es la moneda de operación local y USD la referencia
+    // internacional (1 USD = 700 CUP). Así el negocio ve ambos en el WhatsApp.
+    const usdRate = 700;
+    const cupFmt = (n: number) => `₱${Math.round(n).toLocaleString('es-CU')}`;
+    const usdFmt = (n: number) => `$${(n / usdRate).toFixed(2)}`;
     const senderName = samePerson ? createdOrder.recipientName : formData.customerName;
     const senderEmail = samePerson ? formData.recipientEmail : formData.customerEmail;
     const senderPhone = samePerson ? createdOrder.recipientPhone : formData.customerPhone;
@@ -997,14 +1002,14 @@ export function CheckoutForm() {
     const slotLabel = createdOrder.deliveryTimeSlot === 'asap'
       ? `Entrega Prioritaria ${selectedAsapTime ? `(hora prevista: ${selectedAsapTime})` : '(urgente)'}`
       : `Normal (${normalSchedule})`;
-    const surchargeLine = createdOrder.asapSurcharge > 0
-      ? `\nEntrega Prioritaria: ${formatPrice(createdOrder.asapSurcharge, currency)}`
-      : '';
     const dateLine = createdOrder.deliveryDate
       ? `\n*Entrega:* ${formatDateSpanish(createdOrder.deliveryDate)} · ${slotLabel}`
       : `\n*Entrega:* ${slotLabel}`;
     const subtotal = createdOrder.items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const message = `*NUEVO PEDIDO* ${orderNumber}\n\n*Persona que Envía:*\n${senderName}\n${senderEmail}\n${senderPhone}${sameNote}\n\n*Persona que Recibe:*\n${createdOrder.recipientName}\n${createdOrder.recipientPhone}\n${createdOrder.recipientAddress}, ${createdOrder.recipientCity}${dateLine}\n${formData.recipientNotes ? `Notas: ${formData.recipientNotes}\n` : ''}\n*Productos:*\n${itemsText}\n\nSubtotal: ${formatPrice(subtotal, currency)}\nEnvío: ${formatPrice(createdOrder.shippingCost, currency)}${surchargeLine}\n*Total: ${formatPrice(createdOrder.total, currency)}*\n\n_Pago se gestiona externamente_`;
+    const surchargeCup = createdOrder.asapSurcharge > 0
+      ? `\nEntrega Prioritaria: ${cupFmt(createdOrder.asapSurcharge)}`
+      : '';
+    const message = `🧁 *DULCE ENCANTO* — Eventos & Repostería\n*NUEVO PEDIDO* ${orderNumber}\n\n*Persona que Envía:*\n${senderName}\n${senderEmail}\n${senderPhone}${sameNote}\n\n*Persona que Recibe:*\n${createdOrder.recipientName}\n${createdOrder.recipientPhone}\n${createdOrder.recipientAddress}, ${createdOrder.recipientCity}${dateLine}\n${formData.recipientNotes ? `Notas: ${formData.recipientNotes}\n` : ''}\n*Productos:*\n${itemsText}\n\nSubtotal: ${cupFmt(subtotal)}\nEnvío: ${cupFmt(createdOrder.shippingCost)}${surchargeCup}\n*Total: ${cupFmt(createdOrder.total)} (≈ ${usdFmt(createdOrder.total)} USD)*\n\n_Pago se gestiona externamente_`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 

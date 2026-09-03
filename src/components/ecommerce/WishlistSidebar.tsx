@@ -6,7 +6,7 @@ import { X, Heart, Trash2, ShoppingCart, Loader2 } from 'lucide-react';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice } from '@/store/currency-store';
+import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
 import { useToast } from '@/hooks/use-toast';
 
 interface Product {
@@ -20,7 +20,7 @@ interface Product {
   featured: boolean;
   reservationEnabled?: boolean;
   _count?: { variantGroups: number };
-  category: { id: string; name: string; slug: string; icon: string };
+  category: { id: string; name: string; slug: string; icon: string; section?: string };
 }
 
 /**
@@ -147,7 +147,7 @@ export function WishlistSidebar() {
     }
     toast({
       title: '✓ Movido al carrito',
-      description: `${p.shortName || p.name} — ${formatPrice(p.price, currency)}`,
+      description: `${p.shortName || p.name} — ${formatPrice(p.price, currencyForProduct(p, currency))}`,
       duration: 2200,
     });
     // Opcional: remover de favoritos después de mover al carrito
@@ -289,7 +289,7 @@ export function WishlistSidebar() {
                           </button>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="font-bold text-sm" style={{ color: '#2E1065', fontFamily: 'Georgia, serif' }}>
-                              {formatPrice(p.price, currency)}
+                              {formatPrice(p.price, currencyForProduct(p, currency))}
                             </span>
                             {soldOut && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ background: '#6B7280' }}>

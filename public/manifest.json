@@ -1,39 +1,43 @@
 {
-  "name": "Dulce Encanto Admin",
-  "short_name": "DE Admin",
-  "description": "Panel de administración de Dulce Encanto — repostería artesanal y eventos",
-  "start_url": "/admin",
+  "name": "Dulce Encanto — Eventos & Repostería",
+  "short_name": "Dulce Encanto",
+  "description": "Dulce Encanto — repostería artesanal, tartas personalizadas y eventos en Ciego de Ávila",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#2E1065",
+  "background_color": "#FFFFFF",
   "theme_color": "#A855F7",
-  "categories": ["business", "shopping", "food"],
+  "categories": [
+    "business",
+    "shopping",
+    "food"
+  ],
   "lang": "es-CU",
   "dir": "ltr",
   "icons": [
     {
-      "src": "/favicon.png",
+      "src": "/icon-192.webp",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "any"
     },
     {
-      "src": "/favicon.png",
+      "src": "/icon-512.webp",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "any"
     },
     {
-      "src": "/favicon.png",
+      "src": "/icon-192.webp",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "maskable"
     },
     {
-      "src": "/favicon.png",
+      "src": "/icon-512.webp",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "maskable"
     }
   ],

@@ -18,7 +18,7 @@ export function Footer() {
         setConfig({
           phone: data.phone || '+5350782825',
           whatsappNumber: data.whatsappNumber || '+5350782825',
-          storeName: data.storeName || 'Díaz Premium Envíos',
+          storeName: data.storeName || 'Dulce Encanto',
           address: data.address || 'Ciego de Ávila, Cuba',
           tagline: data.tagline || 'Calidad y confianza en cada envío.',
           logo: data.logo || '/logo-real.webp',

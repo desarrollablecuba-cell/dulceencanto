@@ -531,11 +531,11 @@ export function ImmediateSaleSection() {
             Catálogo de Productos
           </h2>
           <p className="mt-2" style={{ fontSize: '15px', color: '#6B7280' }}>
-            Listo para llevar. Pídelo hoy y lo recibes fresco en Ciego de Ávila.
+            Listo para llevar. Pídelo hoy y lo recibes fresco en Ciego de Ávila. Precios en CUP.
           </p>
         </div>
       </div>
-      <HomeCatalogByCategories />
+      <HomeCatalogByCategories catalog="immediate" />
     </section>
   );
 }
@@ -557,7 +557,7 @@ export function ReservationCatalogSection() {
             ¿Tienes un evento especial? Reserva con 48h de anticipación y personaliza tu pedido. Diseños únicos para cumpleaños, 15 años, bodas y más.
           </p>
         </div>
-        <HomeCatalogByCategories />
+        <HomeCatalogByCategories catalog="reservation" />
       </div>
     </section>
   );

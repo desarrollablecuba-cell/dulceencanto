@@ -108,8 +108,9 @@ function ProductCard({
           </div>
         )}
         <div className="mt-auto">
+          {/* Venta directa (isReservation=false) siempre en CUP; reservas siguen el toggle global */}
           <p className="font-bold mb-2" style={{ fontSize: '18px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
-            {formatPrice(product.price, currency)}
+            {formatPrice(product.price, isReservation ? currency : 'CUP')}
           </p>
 
           {/* Quantity selector — solo en venta directa (no reservas) */}
@@ -287,7 +288,7 @@ export function CatalogView({ catalog }: CatalogViewProps) {
       toast({ title: 'No se pudo agregar', description: result.reason || 'Stock insuficiente.', variant: 'destructive' });
       return;
     }
-    toast({ title: '✓ Agregado al carrito', description: `${qty}× ${product.name} — ${formatPrice(product.price * qty, currency)}`, duration: 2500 });
+    toast({ title: '✓ Agregado al carrito', description: `${qty}× ${product.name} — ${formatPrice(product.price * qty, catalog === 'reservation' ? currency : 'CUP')}`, duration: 2500 });
   };
 
   if (loading) {

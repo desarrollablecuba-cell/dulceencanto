@@ -26,6 +26,11 @@ model Category {
   image     String   @default("")
   order     Int      @default(0)
   active    Boolean  @default(true)
+  // Sección de la tienda donde aparece la categoría (configurable en admin):
+  //  - 'ambas'       → Venta Directa y Reservas (decide el flag del producto)
+  //  - 'immediate'   → solo en Venta Directa (se paga en CUP)
+  //  - 'reservation' → solo en Reservas / Por Encargo
+  section   String   @default("ambas")
   createdAt String   @default("")
   updatedAt String   @default("")
 

@@ -47,7 +47,9 @@ const CAT = {
   image: '/api/uploads/products/prod-1788326250693-8cd14b2ee035.webp',
   order: 4, // entre Pasteles de Tres Pisos (3) y Dulces Finos y Buffet (5)
   active: true,
-};
+  // Sección de la tienda: POR RESERVA (configurable desde el admin)
+  section: 'reservation',
+} as const;
 
 // ─── 2. LOS 13 DULCES FINOS — 40 USD la docena ─────────────────────────────
 
@@ -220,12 +222,12 @@ async function main() {
       image: p.image,
       saleUnit: 'docena',
       categoryId: catId,
-      tags: JSON.stringify(['dulces-finos', 'venta-directa']),
+      tags: JSON.stringify(['dulces-finos', 'por-reserva']),
       status: 'active',
       productType: 'elaborado',
       posAvailable: true,
       tiendaAvailable: true,
-      reservationEnabled: false,
+      reservationEnabled: true,
       stock: 50,
       minHours: 24,
       advanceType: 'sin',

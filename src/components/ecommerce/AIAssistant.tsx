@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
  */
 export function AIAssistant() {
   const [whatsappNumber, setWhatsappNumber] = useState<string>('+5350782825');
-  const [storeName, setStoreName] = useState<string>('Díaz Premium Envíos');
+  const [storeName, setStoreName] = useState<string>('Dulce Encanto');
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
 
   useEffect(() => {

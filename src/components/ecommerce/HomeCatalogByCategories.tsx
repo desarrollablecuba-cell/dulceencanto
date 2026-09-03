@@ -62,7 +62,16 @@ interface Product {
  * Las secciones tienen un `id` basado en el slug de la categoría para
  * poder navegar a ellas vía anchor (#categoria-slug).
  */
-export function HomeCatalogByCategories() {
+interface HomeCatalogByCategoriesProps {
+  /**
+   * Catálogo a mostrar: 'immediate' (Venta Directa), 'reservation'
+   * (Por Reserva) o undefined (todo). La API filtra por la sección de la
+   * categoría (configurable en el admin) + flag reservationEnabled.
+   */
+  catalog?: 'reservation' | 'immediate';
+}
+
+export function HomeCatalogByCategories({ catalog }: HomeCatalogByCategoriesProps = {}) {
   const { selectCategory } = useAppStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [productsByCategory, setProductsByCategory] = useState<Record<string, Product[]>>({});
@@ -84,12 +93,14 @@ export function HomeCatalogByCategories() {
         const cats: Category[] = Array.isArray(catsRaw) ? catsRaw : [];
         setCategories(cats);
 
-        // 2. Cargar productos de cada categoría en paralelo.
+        // 2. Cargar productos de cada categoría en paralelo (respetando el
+        //    catálogo: immediate / reservation / todo).
+        const catalogQ = catalog ? `&catalog=${catalog}` : '';
         // Defensivo: solo iterar si cats es array no vacío.
         const productsPerCat = cats.length > 0 ? await Promise.all(
           cats.map(async (cat) => {
             try {
-              const res = await fetch(`/api/products?category=${cat.slug}&take=12`);
+              const res = await fetch(`/api/products?category=${cat.slug}&take=12${catalogQ}`);
               const data = await res.json().catch(() => []);
               const arr = Array.isArray(data) ? data : (Array.isArray(data?.products) ? data.products : []);
               return { slug: cat.slug, products: arr };
@@ -110,7 +121,7 @@ export function HomeCatalogByCategories() {
       }
     }
     loadData();
-  }, []);
+  }, [catalog]);
 
   // Solo mostrar categorías que tengan al menos 1 producto.
   // Defensivo: si categories no es array, usar [].

@@ -60,7 +60,7 @@ const INCLUDE_PATHS = [
 ];
 
 /** Extensiones de imagen que se convierten a WebP. */
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif'];
+const IMAGE_EXTENSIONS = ['.webp', '.webp', '.webp', '.webp'];
 const WEBP_QUALITY = 80;
 
 /** Extensiones de texto donde se actualizan referencias de imagen. */
