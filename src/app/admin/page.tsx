@@ -61,10 +61,13 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #1E112A 0%, #2E1065 50%, #1E112A 100%)' }}>
       <div className="w-full max-w-md">
-        {/* Branding */}
+        {/* Branding — logo oficial de Dulce Encanto */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-md" style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}>
-            <span style={{ fontSize: '32px' }}>🧁</span>
+          <div
+            className="inline-flex items-center justify-center w-20 h-20 mb-4 rounded-full overflow-hidden"
+            style={{ boxShadow: '0 8px 24px -4px rgba(168,85,247,0.45), 0 0 0 3px rgba(236,72,153,0.35)' }}
+          >
+            <img src="/logo-dulce-encanto.webp" alt="Dulce Encanto" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Georgia, serif' }}>Dulce Encanto</h1>
           <p className="text-brand font-semibold tracking-wider text-sm uppercase mt-1">Panel de Administración</p>
@@ -149,9 +152,12 @@ function AdminLayout({ onLogout }: { onLogout: () => void }) {
       <header className="sticky top-0 z-50 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-md" style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}>
-              <span style={{ fontSize: '18px' }}>🧁</span>
-            </div>
+            <img
+              src="/logo-dulce-encanto.webp"
+              alt="Logo Dulce Encanto"
+              className="w-10 h-10 rounded-full object-cover"
+              style={{ boxShadow: '0 0 0 2px rgba(236,72,153,0.5)' }}
+            />
             <div>
               <h1 className="text-base font-bold text-white" style={{ fontFamily: 'Georgia, serif' }}>Dulce Encanto — Admin</h1>
             </div>

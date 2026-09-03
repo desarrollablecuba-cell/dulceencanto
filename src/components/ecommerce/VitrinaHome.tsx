@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Star, Quote, CalendarHeart, Sparkles } from 'lucide-react';
 import { useAppStore, type AppView } from '@/store/app-store';
 import { HeroSection } from '@/components/ecommerce/HomeSections';
+import { parseSectionImages, type SectionImages } from '@/lib/section-images';
 
 // Lazy-loaded home sections — estos componentes son pesados (carruseles,
 // countdowns, cards con glassmorphism) y solo se necesitan cuando el usuario
@@ -49,6 +50,9 @@ interface ProductCount {
   gallery: number;
 }
 
+// Datos de cada sección del home. La imagen (`image`) es el FALLBACK por
+// defecto — la imagen vigente viene de SiteConfig.sectionImages (JSON sembrado
+// en la BD y reemplazable por el admin desde el Panel → Secciones).
 const SECTION_DATA: Record<string, { title: string; desc: string; image: string; gradient: string; cta: string }> = {
   immediate: {
     title: 'Venta Directa',
@@ -103,6 +107,7 @@ const FALLBACK_TESTIMONIALS: Testimonial[] = [
 export function VitrinaHome() {
   const { setView } = useAppStore();
   const [navSections, setNavSections] = useState<NavSection[]>([]);
+  const [sectionImages, setSectionImages] = useState<SectionImages>(() => parseSectionImages(null));
   const [stats, setStats] = useState<Stat[]>(FALLBACK_STATS);
   const [testimonials, setTestimonials] = useState<Testimonial[]>(FALLBACK_TESTIMONIALS);
   const [sectionsEnabled, setSectionsEnabled] = useState<Record<string, boolean>>({});
@@ -123,6 +128,8 @@ export function VitrinaHome() {
           const ns = JSON.parse(data.navSections || '[]');
           if (Array.isArray(ns) && ns.length > 0) setNavSections(ns.filter((s: NavSection) => s.visible));
         } catch {}
+        // Imágenes de las secciones (configurables desde el admin)
+        setSectionImages(parseSectionImages(data.sectionImages));
         try {
           const st = JSON.parse(data.socialStats || '[]');
           if (Array.isArray(st) && st.length > 0) setStats(st);
@@ -217,6 +224,8 @@ export function VitrinaHome() {
             {sections.map((sec, i) => {
               const info = SECTION_DATA[sec.id];
               if (!info) return null;
+              // Imagen configurable (siteconfig.sectionImages) con fallback al default
+              const sectionImage = sectionImages[sec.id] || info.image;
               const isReversed = i % 2 === 1;
               return (
                 <motion.button
@@ -233,7 +242,7 @@ export function VitrinaHome() {
                     {/* Image */}
                     <div className="relative h-64 md:h-80 overflow-hidden [direction:ltr]">
                       <img
-                        src={info.image}
+                        src={sectionImage}
                         alt={info.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                         loading="lazy"

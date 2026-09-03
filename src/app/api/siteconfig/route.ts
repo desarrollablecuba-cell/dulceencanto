@@ -114,7 +114,7 @@ export async function PUT(request: Request) {
       'footerBgColor', 'footerTextColor', 'footerAccentColor',
       'themeId', 'themeData',
       'homeSectionsOrder', 'homeSectionsEnabled',
-      'offersCarousel', 'savedThemes', 'heroSlides',
+      'offersCarousel', 'savedThemes', 'heroSlides', 'sectionImages',
       'navSections', 'hamburgerItems',
       'zelleEnabled', 'freeShippingEnabled',
       'customerRegistrationEnabled', 'customerLoginEnabled',

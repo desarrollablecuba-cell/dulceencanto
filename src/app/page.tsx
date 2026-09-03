@@ -21,6 +21,13 @@ import {
   type HomeSectionId,
 } from '@/components/ecommerce/HomeSections';
 import { HomeSkeleton } from '@/components/ecommerce/HomeSkeleton';
+import { parseSectionImages, type SectionImages } from '@/lib/section-images';
+
+// Dock de navegación móvil — solo se renderiza en pantallas < lg (CSS lo oculta
+// en desktop). Dinámico para no afectar el bundle inicial.
+const MobileNavDock = dynamic(() => import('@/components/ecommerce/MobileNavDock').then(m => ({ default: m.MobileNavDock })), {
+  ssr: false,
+});
 
 // ── Lazy-loaded view components ──────────────────────────────────────────
 // Estos componentes son pesados (forman sus propios chunks) y solo se cargan
@@ -321,7 +328,18 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentView]);
 
+  // Imágenes de las secciones (configurables desde el admin → Secciones).
+  // Los banners de las páginas de sección usan la misma imagen que la card del home.
+  const [sectionImages, setSectionImages] = useState<SectionImages>(() => parseSectionImages(null));
+  useEffect(() => {
+    fetch('/api/siteconfig')
+      .then((r) => r.json())
+      .then((data) => setSectionImages(parseSectionImages(data?.sectionImages)))
+      .catch(() => {});
+  }, []);
+
   const renderView = () => {
+    const banner = (id: string, fallback: string) => sectionImages[id] || fallback;
     switch (currentView) {
       case 'home':
         return <VitrinaHome />;
@@ -338,31 +356,31 @@ function AppContent() {
       // ── Secciones independientes ──
       case 'immediate':
         return (
-          <SectionPage title="Venta Directa" subtitle="Dulces finos y buffet listos para llevar. Pídelo hoy y recíbelo fresco." icon="🛒" bannerImage="/card-venta-directa.webp">
+          <SectionPage title="Venta Directa" subtitle="Dulces finos y buffet listos para llevar. Pídelo hoy y recíbelo fresco." icon="🛒" bannerImage={banner('immediate', '/card-venta-directa.webp')}>
             <CatalogView catalog="immediate" />
           </SectionPage>
         );
       case 'reservations':
         return (
-          <SectionPage title="Reservas de Tartas y Pasteles" subtitle="Tortas, pasteles de dos y tres pisos, cakes de bandeja. Reserva con 48h de anticipación." icon="📅" bannerImage="/card-reservas.webp">
+          <SectionPage title="Reservas de Tartas y Pasteles" subtitle="Tortas, pasteles de dos y tres pisos, cakes de bandeja. Reserva con 48h de anticipación." icon="📅" bannerImage={banner('reservations', '/card-reservas.webp')}>
             <CatalogView catalog="reservation" />
           </SectionPage>
         );
       case 'services':
         return (
-          <SectionPage title="Servicios para Eventos" subtitle="Decoración, entretenimiento, sueños sorpresa y detalles personalizados." icon="🎨" bannerImage="/card-servicios.webp">
+          <SectionPage title="Servicios para Eventos" subtitle="Decoración, entretenimiento, sueños sorpresa y detalles personalizados." icon="🎨" bannerImage={banner('services', '/card-servicios.webp')}>
             <ServicesSection />
           </SectionPage>
         );
       case 'promotions':
         return (
-          <SectionPage title="Promociones Especiales" subtitle="Ofertas por fechas importantes. Combos especiales para celebrar los momentos que más importan." icon="💝" bannerImage="/card-promociones.webp">
+          <SectionPage title="Promociones Especiales" subtitle="Ofertas por fechas importantes. Combos especiales para celebrar los momentos que más importan." icon="💝" bannerImage={banner('promotions', '/card-promociones.webp')}>
             <PromotionsSection />
           </SectionPage>
         );
       case 'gallery':
         return (
-          <SectionPage title="Galería de Eventos" subtitle="Inspírate con nuestros trabajos anteriores. Cada evento es único, como el tuyo." icon="🖼️" bannerImage="/card-galeria.webp">
+          <SectionPage title="Galería de Eventos" subtitle="Inspírate con nuestros trabajos anteriores. Cada evento es único, como el tuyo." icon="🖼️" bannerImage={banner('gallery', '/card-galeria.webp')}>
             <GallerySection />
           </SectionPage>
         );
@@ -404,6 +422,8 @@ function AppContent() {
         </AnimatePresence>
       </main>
       {!hideFooter && <Footer />}
+      {/* Dock de navegación móvil (Venta Directa, Reservas, Servicios…) */}
+      <MobileNavDock />
       <CartSidebar />
       <WishlistSidebar />
       {currentView !== 'checkout' && <AIAssistant />}

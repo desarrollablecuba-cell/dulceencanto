@@ -7,16 +7,16 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/admin/categories/upload
+ * POST /api/admin/sections/upload
  *
- * Sube la imagen/portada de una categoría (multipart/form-data, campo "file").
- * El AdminPanel llama a esta ruta desde Gestión de Categorías y espera
- * { url } en la respuesta.
- * - Requiere token de admin (header Authorization: Bearer o ?token=).
- * - Convierte a WebP con sharp y guarda en public/categories/.
+ * Sube la imagen de una sección del home (Venta Directa, Reservas,
+ * Servicios, Promociones, Galería) — multipart/form-data, campo "file".
+ * - Requiere token de admin.
+ * - Convierte a WebP con sharp y guarda en public/sections/.
+ * - Devuelve { url, path }; la URL se guarda en SiteConfig.sectionImages.
  */
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function POST(req: Request) {
   const admin = requireAdmin(req);
@@ -44,17 +44,18 @@ export async function POST(req: Request) {
     let ext = 'webp';
     try {
       const sharp = (await import('sharp')).default;
-      output = await sharp(buffer).webp({ quality: 82 }).toBuffer();
+      // 1600px de ancho: las cards de sección son grandes
+      output = await sharp(buffer).resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
     } catch {
       ext = (file.name.split('.').pop() || 'webp').toLowerCase().replace(/[^a-z0-9]/g, '') || 'webp';
     }
 
-    const name = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const dir = path.join(process.cwd(), 'public', 'categories');
+    const name = `section-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const dir = path.join(process.cwd(), 'public', 'sections');
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, name), output);
 
-    const rel = `/categories/${name}`;
+    const rel = `/sections/${name}`;
     return NextResponse.json({ ok: true, path: rel, url: `/api/uploads${rel}` }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Error al subir la imagen' }, { status: 500 });

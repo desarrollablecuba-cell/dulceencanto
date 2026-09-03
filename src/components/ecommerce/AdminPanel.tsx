@@ -112,7 +112,7 @@ import { toast } from 'sonner';
 import { OrderTicket } from '@/components/ecommerce/OrderTicket';
 import { EventReservationsTab } from '@/components/ecommerce/admin/EventReservationsTab';
 import { HeroSlidesEditor, NavSectionsEditor, HamburgerItemsEditor } from '@/components/ecommerce/VisualEditors';
-import { PromotionManager, GalleryManager } from '@/components/ecommerce/SectionManagers';
+import { PromotionManager, GalleryManager, SectionImagesEditor } from '@/components/ecommerce/SectionManagers';
 import { CountryFlag, COUNTRY_INFO } from '@/components/ecommerce/CountryFlag';
 import { PasswordInput } from '@/components/ui/password-input';
 import {
@@ -728,6 +728,7 @@ interface SiteConfig {
   homeSectionsEnabled: string;
   offersCarousel: string;
   savedThemes: string;
+  sectionImages: string;
   zelleEnabled: boolean;
   freeShippingEnabled: boolean;
   customerRegistrationEnabled: boolean;
@@ -7166,6 +7167,24 @@ function SettingsTab() {
             </CardContent>
           </Card>
 
+          {/* Imágenes de las secciones (configurables) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImagePlus className="h-5 w-5 text-brand" />
+                🖼️ Imágenes de las Secciones
+              </CardTitle>
+              <p className="text-sm text-gray-500">Sube tus propias imágenes para las tarjetas de Venta Directa, Reservas, Servicios, Promociones y Galería (se usan en el inicio y en el banner de cada sección).</p>
+            </CardHeader>
+            <CardContent>
+              <SectionImagesEditor
+                value={config.sectionImages || ''}
+                onChange={(v) => updateField('sectionImages', v)}
+              />
+              <SaveButton tabKey="sectionImages" fields={['sectionImages']} className="mt-3" />
+            </CardContent>
+          </Card>
+
           {/* Galería de Eventos */}
           <Card>
             <CardHeader>
@@ -7173,7 +7192,7 @@ function SettingsTab() {
                 <ImagePlus className="h-5 w-5 text-brand" />
                 🖼️ Galería de Eventos
               </CardTitle>
-              <p className="text-sm text-gray-500">Añade, edita o elimina fotos de eventos pasados. Cada item tiene título, imagen, tipo de evento y descripción.</p>
+              <p className="text-sm text-gray-500">Gestiona las categorías de la galería (15 Años, Bodas, Cumpleaños…): portada, fotos reales de eventos, agregar, editar, eliminar y reordenar. Los clientes las ven en un carrusel con vista ampliada.</p>
             </CardHeader>
             <CardContent>
               <GalleryManager />

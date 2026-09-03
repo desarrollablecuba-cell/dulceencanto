@@ -353,6 +353,90 @@ async function sembrarImagenesCategorias() {
   console.log(`[categorias-img] ✓ ${actualizadas} categorías con imagen de un producto real`);
 }
 
+// ─── 7. GALERÍA POR CATEGORÍAS (portadas + fotos de eventos reales) ─────────
+const GALERIA_CATS = [
+  { slug: 'quince-anos', name: '15 Años', icon: '🎀', cover: '/gallery-15anos.webp',
+    description: 'Quinces soñados: tartas de varios pisos, mesas de dulces y decoración temática.',
+    keywords: ['tres pisos', 'dos pisos', 'pavlova', 'macaron'] },
+  { slug: 'cumpleanos-infantiles', name: 'Cumpleaños Infantiles', icon: '🧸', cover: '/gallery-cumple-ninos.webp',
+    description: 'Tartas de personajes, cupcakes coloridos, cakepops y dulces para los más pequeños.',
+    keywords: ['cupcake', 'cakepop', 'dona', 'paleta', 'galleta', 'vaso'] },
+  { slug: 'cumpleanos-adultos', name: 'Cumpleaños de Adultos', icon: '🥂', cover: '/gallery-cumple-adultos.webp',
+    description: 'Celebraciones con estilo: tortas sofisticadas, brownies y dulces finos.',
+    keywords: ['torta', 'brownie', 'cheesecake', 'flan', 'verrine'] },
+  { slug: 'bodas', name: 'Bodas', icon: '💍', cover: '/gallery-boda.webp',
+    description: 'Tartas nupciales de varios pisos, macarons, pavlovas y detalles románticos.',
+    keywords: ['tres pisos', 'macaron', 'pavlova', 'tartaleta', 'verrine'] },
+];
+
+async function sembrarGaleria() {
+  const products = await prisma.product.findMany({ where: { image: { not: '' } }, select: { name: true, image: true } });
+  for (const [i, cat] of GALERIA_CATS.entries()) {
+    let galleryCat = await prisma.galleryCategory.findUnique({ where: { slug: cat.slug } });
+    if (!galleryCat) {
+      galleryCat = await prisma.galleryCategory.create({
+        data: {
+          name: cat.name, slug: cat.slug, description: cat.description, cover: cat.cover,
+          icon: cat.icon, order: i, active: true, createdAt: now, updatedAt: now,
+        },
+      });
+      console.log(`[galeria] ✓ categoría ${cat.name}`);
+    } else {
+      const data = { updatedAt: now };
+      if (!galleryCat.cover) data.cover = cat.cover;
+      if (!galleryCat.description) data.description = cat.description;
+      if (!galleryCat.icon) data.icon = cat.icon;
+      await prisma.galleryCategory.update({ where: { id: galleryCat.id }, data });
+    }
+    const existing = await prisma.galleryPhoto.findMany({ where: { categoryId: galleryCat.id }, select: { image: true } });
+    const have = new Set(existing.map((p) => p.image));
+    let order = existing.length;
+    const addPhoto = async (image, title) => {
+      if (!image || have.has(image)) return;
+      have.add(image);
+      await prisma.galleryPhoto.create({
+        data: { categoryId: galleryCat.id, image, title: title || '', description: '', order: order++, active: true, createdAt: now, updatedAt: now },
+      });
+    };
+    // La portada también es la primera foto del carrusel
+    await addPhoto(cat.cover, `${cat.name} — evento real de Dulce Encanto`);
+    // Fotos de productos reales relacionados (hasta 3)
+    const used = new Set(have);
+    for (const kw of cat.keywords) {
+      if (order >= 4) break; // máximo 4 fotos por categoría al sembrar
+      const p = products.find((pr) => pr.name.toLowerCase().includes(kw) && !used.has(pr.image));
+      if (p) { used.add(p.image); await addPhoto(p.image, ''); }
+    }
+  }
+  const totalCats = await prisma.galleryCategory.count();
+  const totalPhotos = await prisma.galleryPhoto.count();
+  console.log(`[galeria] ✓ ${totalCats} categorías / ${totalPhotos} fotos`);
+}
+
+// ─── 8. IMÁGENES DE LAS SECCIONES DEL HOME (configurables desde el admin) ───
+const SECTION_IMAGES_DEFAULT = {
+  immediate: '/card-venta-directa.webp',
+  reservations: '/card-reservas.webp',
+  services: '/card-servicios.webp',
+  promotions: '/card-promociones.webp',
+  gallery: '/card-galeria.webp',
+};
+
+async function sembrarImagenesSecciones() {
+  const cfg = await prisma.siteConfig.findFirst();
+  if (!cfg) return;
+  let current = {};
+  try { current = JSON.parse(cfg.sectionImages || '{}'); } catch {}
+  // Solo rellenar claves vacías — NUNCA pisa lo que el admin subió
+  const next = { ...SECTION_IMAGES_DEFAULT, ...current };
+  if (JSON.stringify(next) !== JSON.stringify(current)) {
+    await prisma.siteConfig.update({ where: { id: cfg.id }, data: { sectionImages: JSON.stringify(next) } });
+    console.log('[secciones-img] ✓ imágenes de secciones sembradas');
+  } else {
+    console.log('[secciones-img] • ya configuradas');
+  }
+}
+
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
 try {
   console.log('═══════════════════════════════════════════════════════');
@@ -365,6 +449,8 @@ try {
   await sembrarCatalogo();
   await sembrarDulcesFinos();
   await sembrarImagenesCategorias();
+  await sembrarGaleria();
+  await sembrarImagenesSecciones();
   console.log('═══════════════════════════════════════════════════════');
   console.log('  ✅ DB SETUP COMPLETO');
   console.log('═══════════════════════════════════════════════════════');

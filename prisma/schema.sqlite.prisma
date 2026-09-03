@@ -339,6 +339,7 @@ model SiteConfig {
   homeSectionsEnabled         String
   offersCarousel              String
   savedThemes                 String
+  sectionImages               String  @default("")
   zelleEnabled                Boolean @default(true)
   freeShippingEnabled         Boolean @default(true)
   customerRegistrationEnabled Boolean @default(true)
@@ -465,4 +466,40 @@ model GalleryItem {
   active      Boolean @default(true)
   createdAt   String  @default("")
   updatedAt   String  @default("")
+}
+
+// ─── GALERÍA POR CATEGORÍAS (v2) ────────────────────────────────────────────
+// Cada categoría de la galería (15 Años, Bodas, Cumpleaños Infantiles…) tiene
+// una portada y N fotos de eventos reales que el negocio sube desde el admin.
+// El público navega: categoría → carrusel de fotos → vista agrandada.
+
+model GalleryCategory {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  description String         @default("")
+  cover       String         @default("")
+  icon        String         @default("")
+  order       Int            @default(0)
+  active      Boolean        @default(true)
+  createdAt   String         @default("")
+  updatedAt   String         @default("")
+
+  photos      GalleryPhoto[]
+}
+
+model GalleryPhoto {
+  id          String          @id @default(cuid())
+  categoryId  String
+  image       String
+  title       String          @default("")
+  description String          @default("")
+  order       Int             @default(0)
+  active      Boolean         @default(true)
+  createdAt   String          @default("")
+  updatedAt   String          @default("")
+
+  category    GalleryCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
 }
