@@ -142,9 +142,19 @@ export function SpecialDateCountdown() {
             { label: 'Seg', value: remaining.seconds },
           ];
           const fechaStr = target.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
-          const combos = (date.productIds || [])
+          const legacyCombos = (date.productIds || [])
             .map((id) => products.find((p) => p.id === id))
             .filter((p): p is ProductLite => Boolean(p));
+          // Combos v2 (multi-producto): chips resumidos que enlazan a la promoción
+          const combosV2 = (date.combos || []).filter(
+            (c) => c.active !== false && (c.productIds || []).length > 0
+          );
+          const precioCombo = (ids: string[], pct = 0) => {
+            const items = ids.map((id) => products.find((p) => p.id === id)).filter(Boolean) as ProductLite[];
+            if (items.length === 0) return null;
+            const total = items.reduce((n, it) => n + it.price, 0);
+            return Math.round(total * (1 - Math.min(100, Math.max(0, pct)) / 100));
+          };
 
           return (
             <motion.div
@@ -242,14 +252,48 @@ export function SpecialDateCountdown() {
                 </div>
               </div>
 
-              {/* Combos / ofertas de la fecha (productos agrupados por el admin) */}
-              {combos.length > 0 && (
+              {/* Combos / ofertas de la fecha (configurados por el admin) */}
+              {(combosV2.length > 0 || legacyCombos.length > 0) && (
                 <div className="relative border-t px-6 sm:px-8 md:px-12 py-5" style={{ borderColor: 'rgba(255,255,255,0.25)', background: 'rgba(0,0,0,0.18)' }}>
                   <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,255,255,0.9)' }}>
                     🎁 Ofertas para esta fecha
                   </p>
                   <div className="flex gap-3 overflow-x-auto pb-1">
-                    {combos.map((p) => (
+                    {/* Combos v2: chip con nombre + nº de productos + precio final */}
+                    {combosV2.map((c) => {
+                      const precio = precioCombo(c.productIds || [], Number(c.discountPct) || 0);
+                      const thumb = products.find((p) => (c.productIds || []).includes(p.id))?.image;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => setView('promotions')}
+                          className="flex items-center gap-3 rounded-2xl px-3 py-2 shrink-0 transition-transform hover:scale-105 text-left"
+                          style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)' }}
+                          title={`Ver combo: ${c.name}`}
+                        >
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={thumb} alt="" className="h-11 w-11 rounded-xl object-cover" />
+                          ) : (
+                            <div className="h-11 w-11 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(255,255,255,0.2)' }}>🎁</div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white truncate max-w-[170px]">{c.name}</p>
+                            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                              {(c.productIds || []).length} productos
+                              {precio !== null && (
+                                <span className="font-bold ml-1.5" style={{ color: date.accent }}>₱{precio.toLocaleString('es-CU')}</span>
+                              )}
+                              {(Number(c.discountPct) || 0) > 0 && (
+                                <span className="ml-1 font-bold" style={{ color: '#FDE68A' }}>-{c.discountPct}%</span>
+                              )}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {/* Legacy: productos sueltos */}
+                    {legacyCombos.map((p) => (
                       <div
                         key={p.id}
                         className="flex items-center gap-3 rounded-2xl px-3 py-2 shrink-0"

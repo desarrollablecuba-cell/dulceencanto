@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, GripVertical, RefreshCw, Loader2 } from 'lucide-react';
+import { Trash2, Plus, GripVertical, RefreshCw, Loader2, ImagePlus, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  PromotionManager — editor visual de promociones (CRUD via API)
@@ -647,6 +647,331 @@ export function SectionImagesEditor({ value, onChange }: { value: string; onChan
       })}
       <p className="text-[11px] text-gray-400">
         Recuerda pulsar <strong>Guardar</strong> para aplicar los cambios. “Restaurar” devuelve la imagen sembrada por defecto.
+      </p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ServicesManager — CRUD de Servicios para Eventos (cards verticales con
+//  imagen protagonista). API: /api/admin/services (requiere admin).
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ServiceRow {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  image: string;
+  price: number;
+  priceUsd: number;
+  category: string;
+  active: boolean;
+  order: number;
+}
+
+const SERVICE_CATEGORIES = [
+  { value: 'decoracion', label: '🎨 Decoración' },
+  { value: 'entretenimiento', label: '🎪 Entretenimiento' },
+  { value: 'personalizado', label: '✨ Personalizado' },
+  { value: 'suenos_sorpresa', label: '🙀 Sueños Sorpresa' },
+];
+
+/** Sube la imagen de un servicio a /api/admin/services/upload → /services/xxx.webp */
+async function uploadServiceImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/admin/services/upload', {
+    method: 'POST',
+    headers: adminAuthHeaders(),
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error al subir (${res.status})`);
+  return data.path as string;
+}
+
+export function ServicesManager() {
+  const [services, setServices] = useState<ServiceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    fetch('/api/admin/services', { headers: adminAuthHeaders() })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setServices(data);
+        else setError(data?.error || 'Respuesta inválida');
+      })
+      .catch(() => setError('No se pudieron cargar los servicios'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const patch = (id: string, fields: Partial<ServiceRow>) =>
+    setServices((list) => list.map((s) => (s.id === id ? { ...s, ...fields } : s)));
+
+  const save = async (svc: ServiceRow) => {
+    setSaving(svc.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/services', {
+        method: 'PUT',
+        headers: adminAuthHeaders(true),
+        body: JSON.stringify(svc),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Error al guardar');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const addService = async () => {
+    const now = Date.now();
+    const draft: ServiceRow = {
+      id: '',
+      name: 'Nuevo servicio',
+      description: 'Describe el servicio para eventos…',
+      icon: '✨',
+      image: '',
+      price: 1000,
+      priceUsd: 2,
+      category: 'decoracion',
+      active: true,
+      order: (services.length ? Math.max(...services.map((s) => s.order)) + 1 : 0),
+    };
+    try {
+      const res = await fetch('/api/admin/services', {
+        method: 'POST',
+        headers: adminAuthHeaders(true),
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      setServices((list) => [...list, { ...draft, ...data }]);
+    } catch (e: any) {
+      setError(e?.message || 'Error al crear el servicio');
+    }
+  };
+
+  const removeService = async (svc: ServiceRow) => {
+    if (!confirm(`¿Eliminar "${svc.name}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`/api/admin/services?id=${encodeURIComponent(svc.id)}`, {
+        method: 'DELETE',
+        headers: adminAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      setServices((list) => list.filter((s) => s.id !== svc.id));
+    } catch (e: any) {
+      setError(e?.message || 'Error al eliminar');
+    }
+  };
+
+  const move = async (svc: ServiceRow, dir: -1 | 1) => {
+    const sorted = [...services].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((s) => s.id === svc.id);
+    const j = idx + dir;
+    if (j < 0 || j >= sorted.length) return;
+    const a = sorted[idx];
+    const b = sorted[j];
+    patch(a.id, { order: b.order });
+    patch(b.id, { order: a.order });
+    await Promise.all([
+      fetch('/api/admin/services', { method: 'PUT', headers: adminAuthHeaders(true), body: JSON.stringify({ ...a, order: b.order }) }),
+      fetch('/api/admin/services', { method: 'PUT', headers: adminAuthHeaders(true), body: JSON.stringify({ ...b, order: a.order }) }),
+    ]);
+    load();
+  };
+
+  const uploadImg = async (svc: ServiceRow, file: File) => {
+    setUploadingId(svc.id);
+    setError(null);
+    try {
+      const path = await uploadServiceImage(file);
+      patch(svc.id, { image: path });
+      // Auto-guardar la imagen al subirla
+      await fetch('/api/admin/services', {
+        method: 'PUT',
+        headers: adminAuthHeaders(true),
+        body: JSON.stringify({ ...svc, image: path }),
+      });
+    } catch (e: any) {
+      setError(e?.message || 'Error al subir la imagen');
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-400 py-6">
+        <Loader2 className="h-4 w-4 animate-spin" /> Cargando servicios…
+      </div>
+    );
+  }
+
+  const sorted = [...services].sort((a, b) => a.order - b.order);
+
+  return (
+    <div className="space-y-3">
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2">{error}</div>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-gray-500">
+          {sorted.length} {sorted.length === 1 ? 'servicio' : 'servicios'} · la foto es la protagonista de la card vertical
+        </p>
+        <Button variant="outline" size="sm" type="button" onClick={addService}>
+          <Plus className="h-4 w-4 mr-1" /> Agregar servicio
+        </Button>
+      </div>
+
+      {sorted.length === 0 && (
+        <p className="text-xs text-gray-400 italic">Sin servicios — agrega el primero.</p>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {sorted.map((s) => (
+          <div key={s.id} className={`rounded-lg border p-3 space-y-2 ${s.active ? 'border-pink-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
+            <div className="flex gap-3">
+              {/* Imagen protagonista (preview vertical 3:4) */}
+              <div className="relative w-24 shrink-0 rounded-lg overflow-hidden border border-gray-200 bg-gray-100" style={{ aspectRatio: '3 / 4' }}>
+                {s.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-3xl">{s.icon || '✨'}</div>
+                )}
+                {uploadingId === s.id && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-pink-600" />
+                  </div>
+                )}
+              </div>
+              {/* Campos */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex gap-2 items-center">
+                  <Input
+                    value={s.icon}
+                    onChange={(e) => patch(s.id, { icon: e.target.value.slice(0, 4) })}
+                    className="w-12 text-center h-8"
+                    aria-label="Emoji"
+                  />
+                  <Input
+                    value={s.name}
+                    onChange={(e) => patch(s.id, { name: e.target.value })}
+                    className="flex-1 h-8 text-xs font-semibold"
+                    placeholder="Nombre del servicio"
+                  />
+                  <Button
+                    variant="ghost" size="icon" type="button"
+                    className="text-red-500 hover:bg-red-50 shrink-0 h-8 w-8"
+                    onClick={() => removeService(s)}
+                    aria-label="Eliminar servicio"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Textarea
+                  value={s.description}
+                  onChange={(e) => patch(s.id, { description: e.target.value })}
+                  className="min-h-[52px] text-xs"
+                  placeholder="Descripción"
+                />
+                <div className="flex gap-2 flex-wrap items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-400">₱</span>
+                    <Input
+                      type="number" min={0}
+                      value={s.price}
+                      onChange={(e) => patch(s.id, { price: Number(e.target.value) || 0 })}
+                      className="w-24 h-8 text-xs"
+                      aria-label="Precio CUP"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-400">$</span>
+                    <Input
+                      type="number" min={0} step="0.01"
+                      value={s.priceUsd}
+                      onChange={(e) => patch(s.id, { priceUsd: Number(e.target.value) || 0 })}
+                      className="w-20 h-8 text-xs"
+                      aria-label="Precio USD"
+                    />
+                  </div>
+                  <select
+                    value={s.category}
+                    onChange={(e) => patch(s.id, { category: e.target.value })}
+                    className="rounded-md border border-gray-300 bg-white px-2 h-8 text-xs"
+                    aria-label="Categoría"
+                  >
+                    {SERVICE_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            {/* Acciones: foto, activo, orden, guardar */}
+            <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-100">
+              <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && s.id) uploadImg(s, file);
+                    e.target.value = '';
+                  }}
+                />
+                <ImagePlus className="h-3.5 w-3.5" /> {s.image ? 'Cambiar foto' : 'Subir foto'}
+              </label>
+              {s.image && (
+                <button
+                  type="button"
+                  className="px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-red-500 bg-red-50 hover:bg-red-100"
+                  onClick={() => { patch(s.id, { image: '' }); }}
+                >
+                  Quitar foto
+                </button>
+              )}
+              <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={s.active}
+                  onChange={(e) => { patch(s.id, { active: e.target.checked }); setTimeout(() => { const row = services.find((x) => x.id === s.id); if (row) save({ ...row, active: e.target.checked }); }, 0); }}
+                  className="accent-green-600 h-4 w-4"
+                />
+                {s.active ? 'Visible' : 'Oculto'}
+              </label>
+              <div className="flex flex-col gap-0.5 ml-auto">
+                <Button variant="ghost" size="icon" type="button" className="h-5 w-5" onClick={() => move(s, -1)} aria-label="Subir" title="Subir orden">
+                  <ChevronUp className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" type="button" className="h-5 w-5" onClick={() => move(s, 1)} aria-label="Bajar" title="Bajar orden">
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </div>
+              <Button size="sm" type="button" className="h-8" onClick={() => save(s)} disabled={saving === s.id}>
+                {saving === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-400">
+        Recuerda pulsar <strong>Guardar</strong> tras editar textos o precios. La foto se guarda automáticamente al subirla.
       </p>
     </div>
   );

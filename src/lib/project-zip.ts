@@ -356,6 +356,17 @@ async function collectFiles(
 // vez de entregar un paquete viejo incompleto.
 
 const REQUIRED_LATEST: [string, RegExp?][] = [
+  // V52 — Servicios con foto protagonista (cards verticales)
+  ['src/components/ecommerce/ServicesSection.tsx', /aspectRatio[^,]*3[^,]*4/],
+  ['src/app/api/admin/services/route.ts'],
+  ['src/app/api/admin/services/upload/route.ts'],
+  ['scripts/seed-extras.ts', /\/services\/srv-/],
+  ['public/services/srv-sublimacion.webp'],
+  ['public/services/srv-munecos.webp'],
+  ['data/seed-special-dates.json', /"combos"/],
+  // V52 — Promociones: card de promoción con combos multi-producto dentro
+  ['src/components/ecommerce/PromotionsSection.tsx', /SpecialDateComboCfg/],
+  ['src/lib/special-dates.ts', /SpecialDateCombo/],
   // Galería v2 (portadas + carrusel + lightbox) — API y frontend
   ['src/components/ecommerce/GallerySection.tsx'],
   ['src/app/api/admin/gallery/route.ts'],
@@ -376,6 +387,7 @@ const REQUIRED_LATEST: [string, RegExp?][] = [
   ['src/app/api/health/route.ts'],
   // Deploy
   ['scripts/db-setup.mjs', /verificarColumnasCriticas/],
+  ['scripts/db-setup.mjs', /sembrarV52Combos/],
   ['scripts/start-railway.mjs'],
   ['scripts/schema-mysql.sql', /ADD COLUMN `section` VARCHAR\(191\)/],
   ['prisma/migrations/20260903000000_add_category_section/migration.sql'],
@@ -572,7 +584,14 @@ async function buildProjectZip(
       '    "hint" del JSON y los logs de arranque en Railway',
       '    ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).',
       '',
-      'ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO:',
+      'ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO (V52):',
+      ' - Servicios para Eventos: cards VERTICALES con foto protagonista',
+      '   real (pullover personalizado, payasita humana, decoración, globos…)',
+      '   + gestión completa desde el admin (crear/editar/ordenar/subir foto)',
+      ' - Promociones v2: card de la promoción (ej: Día de las Madres) con',
+      '   las cards de los COMBOS dentro — cada combo se conforma desde el',
+      '   admin eligiendo MÁS DE UN producto (suma de precios + descuento).',
+      '   El cliente puede pedir el combo completo de un clic.',
       ' - Galería v2: portadas por categoría + carrusel + lightbox gigante',
       ' - Imágenes de secciones configurables (sembradas en BD + subida admin)',
       ' - Dock de navegación móvil + header compacto',
@@ -580,8 +599,10 @@ async function buildProjectZip(
       ' - Precios: pasteles 120/140 USD · tortas 30/40/60 USD',
       ' - Moneda USD por defecto; venta directa siempre en CUP',
       ' - Logo oficial + favicon sin fondo blanco',
-      ' - Autorreparación de BD al arrancar (columnas/tablas faltantes)',
+      ' - Autorreparación de BD al arrancar (columnas/tablas faltantes',
+      '   + fotos de servicios y specialDates con combos en BDs existentes)',
       ' - /api/health para diagnóstico del deploy',
+      ' - /api/download genera este paquete con versionado incremental',
       '',
       'DESPLEGAR: ver DEPLOY-RAILWAY.md',
       '════════════════════════════════════════════════════════════',

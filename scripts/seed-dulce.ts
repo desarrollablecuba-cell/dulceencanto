@@ -18,9 +18,17 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 const now = new Date().toISOString();
+
+// Fechas especiales + combos (v52) — fuente compartida: data/seed-special-dates.json
+// (la misma que usa scripts/db-setup.mjs en Railway).
+const SPECIAL_DATES_SEED = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'data', 'seed-special-dates.json'), 'utf-8')
+);
 
 // ─── CATEGORÍAS (6 reposteras) ─────────────────────────────────────────────
 const categories = [
@@ -211,6 +219,9 @@ const siteConfig = {
   themeData: '',
   homeSectionsOrder: 'hero,topSelling,featuredCategories,specialDate,buyFrom,benefits,offers,immediateSale,reservationCatalog,services,promotions,gallery,schedule,deliveryZones,storeReviews,quickContact,promoBanner,socialStats',
   homeSectionsEnabled: '{}',
+  // Fechas especiales con COMBOS multi-producto (v52): la card de cada
+  // promoción (ej: Día de las Madres) contiene las cards de sus combos.
+  specialDates: JSON.stringify(SPECIAL_DATES_SEED),
   navSections: JSON.stringify([
     { id: 'immediate', label: 'Venta Directa', icon: '🛒', visible: true },
     { id: 'reservations', label: 'Reservas', icon: '📅', visible: true },

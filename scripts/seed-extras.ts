@@ -30,51 +30,61 @@ const services = [
     id: 'srv-decoracion', name: 'Decoración del Evento',
     description: 'Decoración completa del salón: centros de mesa, guirnaldas, telas, iluminación temática y ambientación según la ocasión.',
     icon: '🎨', category: 'decoracion', price: 5000, order: 0,
+    image: '/services/srv-decoracion.webp',
   },
   {
     id: 'srv-munecos', name: 'Muñecos Sorpresa',
-    description: 'Muñecos sorpresa de personajes infantiles y de moda. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.',
+    description: 'Muñecos sorpresa de personajes infantiles y de moda — payasitas humanas, personajes y animación. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.',
     icon: '🧸', category: 'entretenimiento', price: 2500, order: 1,
+    image: '/services/srv-munecos.webp',
   },
   {
     id: 'srv-canon', name: 'Cañón de Confeti',
     description: 'Cañones de confeti para el momento culminante: la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.',
     icon: '🎉', category: 'entretenimiento', price: 1200, order: 2,
+    image: '/services/srv-canon.webp',
   },
   {
     id: 'srv-burbujas', name: 'Máquina de Burbujas',
     description: 'Máquina profesional de burbujas continua durante 2 horas. Magia visual para fotos y momento de baile.',
     icon: '🫧', category: 'entretenimiento', price: 1500, order: 3,
+    image: '/services/srv-burbujas.webp',
   },
   {
     id: 'srv-caja-regalo', name: 'Caja de Regalos Personalizada',
     description: 'Caja decorada a mano con productos a tu elección: tartas mini, galletas, cupcakes y detalles personalizados.',
     icon: '🎁', category: 'decoracion', price: 1800, order: 4,
+    image: '/services/srv-caja-regalo.webp',
   },
   {
     id: 'srv-vela-volcanica', name: 'Vela Volcánica',
     description: 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.',
     icon: '🌋', category: 'entretenimiento', price: 800, order: 5,
+    image: '/services/srv-vela-volcanica.webp',
   },
   {
     id: 'srv-globos', name: 'Decoración con Globos',
     description: 'Arcos, columnas y bouquets de globos con colores temáticos. Globos helados para un toque premium.',
     icon: '🎈', category: 'decoracion', price: 2200, order: 6,
+    image: '/services/srv-globos.webp',
   },
   {
     id: 'srv-sublimacion', name: 'Sublimación de Pullovers',
-    description: 'Pullovers personalizados con el nombre, foto o temática del evento. Recuerdos únicos para los invitados.',
+    description: 'Pullovers personalizados con el nombre, foto o temática del evento — sublimación real de alta calidad. Recuerdos únicos para los invitados.',
     icon: '👕', category: 'personalizado', price: 1200, order: 7,
+    image: '/services/srv-sublimacion.webp',
   },
   {
     id: 'srv-jarras', name: 'Jarras Personalizadas',
     description: 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.',
     icon: '🫗', category: 'personalizado', price: 1500, order: 8,
+    image: '/services/srv-jarras.webp',
   },
   {
     id: 'srv-gigantografias', name: 'Gigantografías',
     description: 'Impresión gran formato para fotos de cuerpo entero, fondos de escenario o banners de bienvenida. Hasta 2x3 metros.',
     icon: '🖼️', category: 'decoracion', price: 2000, order: 9,
+    image: '/services/srv-gigantografias.webp',
   },
 ];
 
@@ -146,10 +156,24 @@ async function main() {
   console.log('  🎉 SEMILLA — Servicios, Promociones y Galería');
   console.log('═══════════════════════════════════════════════════════\n');
 
-  // Guard: si ya hay servicios, omitir (protege datos reales en redeploys).
+  // Guard: si ya hay servicios, omitir la resiembra completa (protege datos
+  // reales en redeploys) PERO aplicar la foto protagonista de la card vertical
+  // (v52) a los 10 servicios conocidos — solo si aún no tienen imagen.
   const existingServices = await prisma.service.count();
   if (existingServices > 0 && process.env.FORCE_SEED !== '1') {
+    let actualizados = 0;
+    for (const s of services) {
+      const current = await prisma.service.findUnique({ where: { id: s.id }, select: { image: true } });
+      if (current && !current.image && s.image) {
+        await prisma.service.update({
+          where: { id: s.id },
+          data: { image: s.image, updatedAt: now },
+        });
+        actualizados++;
+      }
+    }
     console.log(`  ⏭️  La BD ya contiene ${existingServices} servicios. Seed omitido.`);
+    console.log(`  🖼️  Fotos de servicios aplicadas: ${actualizados} (solo vacías).`);
     console.log('  ⏭️  Para forzar la resiembra: FORCE_SEED=1\n');
     return;
   }

@@ -27,6 +27,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   decoracion: '#A855F7',
   entretenimiento: '#EC4899',
   personalizado: '#F59E0B',
+  suenos_sorpresa: '#8B5CF6',
 };
 
 export function ServicesSection({ onReserve }: { onReserve?: () => void }) {
@@ -61,7 +62,7 @@ export function ServicesSection({ onReserve }: { onReserve?: () => void }) {
             Hacemos realidad tu celebración
           </h2>
           <p className="mt-2 max-w-2xl mx-auto" style={{ fontSize: '15px', color: '#6B7280' }}>
-            Decoración, entretenimiento y detalles personalizados. Combina los servicios que necesites para un evento inolvidable.
+            Decoración, entretenimiento y detalles personalizados con fotos reales de nuestro trabajo. Combina los servicios que necesites para un evento inolvidable.
           </p>
 
           {/* Indicador de moneda (solo informativo — el toggle global está en el Header) */}
@@ -70,8 +71,8 @@ export function ServicesSection({ onReserve }: { onReserve?: () => void }) {
           </div>
         </div>
 
-        {/* Grid de servicios */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* Grid de servicios — cards VERTICALES con imagen protagonista */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
           {services.map((s) => {
             const color = CATEGORY_COLORS[s.category] || '#A855F7';
             const price = currency === 'CUP' ? s.price : s.priceUsd;
@@ -79,55 +80,80 @@ export function ServicesSection({ onReserve }: { onReserve?: () => void }) {
             return (
               <div
                 key={s.id}
-                className="group flex flex-col rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1"
+                className="group flex flex-col overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1.5"
                 style={{
                   background: '#FFF',
                   border: '1px solid #FBCFE8',
                   boxShadow: '0 4px 14px -2px rgba(236,72,153,0.08)',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 12px 28px -6px ${color}33`; }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 14px 32px -8px ${color}44`; }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px -2px rgba(236,72,153,0.08)'; }}
               >
-                <div className="flex items-start gap-4 mb-3">
+                {/* Imagen protagonista (vertical, ~65% de la card) */}
+                <div
+                  className="relative w-full overflow-hidden"
+                  style={{ aspectRatio: '3 / 4', background: `linear-gradient(160deg, ${color}26 0%, ${color}0D 100%)` }}
+                >
+                  {s.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.image}
+                      alt={`${s.name} — foto real de Dulce Encanto`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="transition-transform duration-300 group-hover:scale-110" style={{ fontSize: '64px', filter: 'drop-shadow(0 6px 14px rgba(46,16,101,0.22))' }}>
+                        {s.icon}
+                      </span>
+                    </div>
+                  )}
+                  {/* Scrim inferior para legibilidad del badge */}
                   <div
-                    className="flex items-center justify-center rounded-2xl shrink-0 transition-transform group-hover:scale-110 overflow-hidden"
-                    style={{ width: '56px', height: '56px', background: `${color}1A`, border: `2px solid ${color}33` }}
+                    className="absolute inset-x-0 bottom-0 h-16 pointer-events-none"
+                    style={{ background: 'linear-gradient(180deg, transparent 0%, rgba(46,16,101,0.45) 100%)' }}
+                    aria-hidden
+                  />
+                  {/* Badge de categoría sobre la imagen */}
+                  <span
+                    className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white"
+                    style={{ background: 'rgba(46,16,101,0.78)', backdropFilter: 'blur(4px)' }}
                   >
-                    {s.image ? (
-                      <img src={s.image} alt={s.name} className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      <span style={{ fontSize: '28px' }}>{s.icon}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>
-                      {CATEGORY_LABELS[s.category] || s.category}
-                    </span>
-                    <h3 className="font-semibold leading-tight" style={{ fontSize: '16px', color: '#2E1065', fontFamily: 'Georgia, serif' }}>
-                      {s.name}
-                    </h3>
+                    {CATEGORY_LABELS[s.category] || s.category}
+                  </span>
+                  {/* Precio destacado sobre la imagen */}
+                  <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="block text-[9px] uppercase tracking-widest font-semibold" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                        Desde
+                      </span>
+                      <span className="font-bold text-white leading-tight drop-shadow-md" style={{ fontSize: '19px', fontFamily: 'Georgia, serif' }}>
+                        {symbol}{price.toLocaleString('es-CU')}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        toast({ title: '✓ Servicio añadido', description: `${s.name} — lo incluirás en tu reserva de evento`, duration: 2500 });
+                        openReservation();
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-semibold text-white transition-all hover:scale-105 active:scale-95 shrink-0"
+                      style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}DD 100%)`, boxShadow: `0 4px 12px ${color}55` }}
+                      aria-label={`Reservar ${s.name}`}
+                    >
+                      <CalendarHeart className="h-3.5 w-3.5" /> Reservar
+                    </button>
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed mb-4 flex-1" style={{ color: '#6B7280' }}>
-                  {s.description}
-                </p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase tracking-wider" style={{ color: '#9CA3AF' }}>Desde</span>
-                    <p className="font-bold" style={{ fontSize: '20px', color, fontFamily: 'Georgia, serif' }}>
-                      {symbol}{price.toLocaleString('es-CU')}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      toast({ title: '✓ Servicio añadido', description: `${s.name} — lo incluirás en tu reserva de evento`, duration: 2500 });
-                      openReservation();
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold text-white transition-all"
-                    style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}DD 100%)`, boxShadow: `0 4px 12px ${color}44` }}
-                  >
-                    <CalendarHeart className="h-3.5 w-3.5" /> Reservar
-                  </button>
+
+                {/* Contenido */}
+                <div className="flex flex-col flex-1 p-3.5">
+                  <h3 className="font-semibold leading-snug line-clamp-2" style={{ fontSize: '14px', color: '#2E1065', fontFamily: 'Georgia, serif', minHeight: '2.4em' }}>
+                    {s.name}
+                  </h3>
+                  <p className="text-xs leading-relaxed mt-1.5 line-clamp-3 flex-1" style={{ color: '#6B7280' }}>
+                    {s.description}
+                  </p>
                 </div>
               </div>
             );

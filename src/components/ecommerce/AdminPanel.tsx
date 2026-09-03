@@ -112,7 +112,7 @@ import { toast } from 'sonner';
 import { OrderTicket } from '@/components/ecommerce/OrderTicket';
 import { EventReservationsTab } from '@/components/ecommerce/admin/EventReservationsTab';
 import { HeroSlidesEditor, NavSectionsEditor, HamburgerItemsEditor } from '@/components/ecommerce/VisualEditors';
-import { PromotionManager, GalleryManager, SectionImagesEditor } from '@/components/ecommerce/SectionManagers';
+import { PromotionManager, GalleryManager, SectionImagesEditor, ServicesManager } from '@/components/ecommerce/SectionManagers';
 import { CountryFlag, COUNTRY_INFO } from '@/components/ecommerce/CountryFlag';
 import { PasswordInput } from '@/components/ui/password-input';
 import {
@@ -454,7 +454,31 @@ const SPECIAL_GRADIENTS = [
 interface SpecialDateRow {
   name: string; emoji: string; month: number; day: number;
   description: string; theme: string; image?: string;
+  active?: boolean; order?: number; productIds?: string[];
+  combos?: SpecialDateComboRow[];
 }
+
+/** Un combo de promoción: se conforma eligiendo MÁS DE UN producto. */
+interface SpecialDateComboRow {
+  id: string;
+  name: string;
+  description: string;
+  image?: string;
+  discountPct: number;
+  productIds: string[];
+  active: boolean;
+  order: number;
+}
+
+const newComboRow = (order: number): SpecialDateComboRow => ({
+  id: `combo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  name: '',
+  description: '',
+  discountPct: 0,
+  productIds: [],
+  active: true,
+  order,
+});
 
 function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
@@ -486,6 +510,18 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     active: r?.active !== false,
     order: typeof r?.order === 'number' ? r.order : 0,
     productIds: Array.isArray(r?.productIds) ? r.productIds.map(String) : [],
+    combos: Array.isArray(r?.combos)
+      ? r.combos.map((c: Partial<SpecialDateComboRow>, ci: number) => ({
+          id: String(c?.id || `combo-${ci}-${Math.random().toString(36).slice(2, 7)}`),
+          name: String(c?.name || ''),
+          description: String(c?.description || ''),
+          image: c?.image || undefined,
+          discountPct: Number(c?.discountPct) || 0,
+          productIds: Array.isArray(c?.productIds) ? c.productIds.map(String) : [],
+          active: c?.active !== false,
+          order: typeof c?.order === 'number' ? c.order : ci,
+        }))
+      : [],
   }));
   // Si no hay fechas guardadas, partir de la lista por defecto para que el
   // admin pueda EDITARLAS o ELIMINARLAS (ej: quitar el Día de los Padres).
@@ -495,6 +531,13 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
       description: d.description, theme: d.theme, image: d.image,
       active: d.active !== false, order: typeof d.order === 'number' ? d.order : i,
       productIds: d.productIds || [],
+      combos: (d.combos || []).map((c, ci) => ({
+        id: c.id || `combo-def-${i}-${ci}`,
+        name: c.name, description: c.description || '',
+        image: c.image, discountPct: Number(c.discountPct) || 0,
+        productIds: c.productIds || [],
+        active: c.active !== false, order: typeof c.order === 'number' ? c.order : ci,
+      })),
     }));
   }
 
@@ -510,6 +553,25 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
     );
   const set = (i: number, patch: Partial<SpecialDateRow>) =>
     emit(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  // Helpers de combos: setCombo actualiza un combo de una fecha
+  const setCombo = (i: number, comboIdx: number, patch: Partial<SpecialDateComboRow>) =>
+    set(i, {
+      combos: (rows[i].combos || []).map((c, ci) => (ci === comboIdx ? { ...c, ...patch } : c)),
+    });
+  const addCombo = (i: number) =>
+    set(i, { combos: [...(rows[i].combos || []), newComboRow((rows[i].combos || []).length)] });
+  const removeCombo = (i: number, comboIdx: number) =>
+    set(i, { combos: (rows[i].combos || []).filter((_, ci) => ci !== comboIdx) });
+  const moveCombo = (i: number, comboIdx: number, dir: -1 | 1) => {
+    const list = [...(rows[i].combos || [])];
+    const j = comboIdx + dir;
+    if (j < 0 || j >= list.length) return;
+    const tmp = list[comboIdx].order;
+    list[comboIdx] = { ...list[comboIdx], order: list[j].order };
+    list[j] = { ...list[j], order: tmp };
+    list.sort((a, b) => a.order - b.order);
+    set(i, { combos: list });
+  };
   // El año del picker = próxima ocurrencia de esa fecha (si ya pasó este
   // año, muestra el siguiente). Al guardar solo se conservan mes/día:
   // el countdown siempre calcula la próxima ocurrencia.
@@ -657,11 +719,186 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
             )}
             <p className="text-[11px] text-gray-400 leading-snug">Imagen de fondo de la tarjeta (opcional)</p>
           </div>
-          {/* Combos: productos de la tienda agrupados para esta fecha */}
+          {/* ── COMBOS v2: cards de combo (multi-producto) dentro de la promoción ── */}
+          <div className="rounded-lg border border-pink-200 bg-white px-3 py-2.5 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold">
+                🎁 Combos de esta promoción{' '}
+                <span className="text-gray-400 font-normal">
+                  ({(r.combos || []).length} {(r.combos || []).length === 1 ? 'combo' : 'combos'})
+                </span>
+              </p>
+              <Button variant="outline" size="sm" type="button" onClick={() => addCombo(i)} className="h-7 text-xs">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Agregar combo
+              </Button>
+            </div>
+            <p className="text-[11px] text-gray-400 leading-snug">
+              Cada combo se muestra como una card dentro de la promoción. Elige <strong>más de un producto</strong> para
+              conformarlo (se suman los precios y puede llevar descuento).
+            </p>
+            {(r.combos || []).length === 0 && (
+              <p className="text-xs text-gray-400 italic py-1">Sin combos — agrega el primero con el botón de arriba.</p>
+            )}
+            {(r.combos || []).map((c, ci) => {
+              const comboTotal = c.productIds.reduce(
+                (n, id) => n + (catalog.find((p) => p.id === id)?.price || 0),
+                0
+              );
+              return (
+                <div key={c.id} className={`rounded-md border p-2.5 space-y-2 ${c.active ? 'border-pink-200 bg-pink-50/40' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
+                  {/* Fila superior: activo, orden, eliminar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-col items-center gap-0.5 shrink-0">
+                      <Switch checked={c.active} onCheckedChange={(v) => setCombo(i, ci, { active: v })} aria-label="Mostrar combo" />
+                      <span className={`text-[10px] font-semibold ${c.active ? 'text-green-600' : 'text-gray-400'}`}>
+                        {c.active ? 'Visible' : 'Oculto'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon" type="button" className="h-5 w-5" onClick={() => moveCombo(i, ci, -1)} disabled={ci === 0} aria-label="Subir combo" title="Subir orden del combo">
+                        <ChevronUp className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" type="button" className="h-5 w-5" onClick={() => moveCombo(i, ci, 1)} disabled={ci === (r.combos || []).length - 1} aria-label="Bajar combo" title="Bajar orden del combo">
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <Input
+                      value={c.name}
+                      onChange={(e) => setCombo(i, ci, { name: e.target.value })}
+                      placeholder="Nombre del combo (ej: Combo Mamá Querida)"
+                      className="flex-1 min-w-[140px] h-8 text-xs"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Input
+                        type="number" min={0} max={100}
+                        value={c.discountPct}
+                        onChange={(e) => setCombo(i, ci, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+                        className="w-16 h-8 text-xs"
+                        aria-label="Descuento %"
+                      />
+                      <span className="text-xs text-gray-500">% dcto.</span>
+                    </div>
+                    <Button
+                      variant="ghost" size="icon" type="button"
+                      className="text-red-500 hover:bg-red-50 shrink-0 h-8 w-8"
+                      onClick={() => { if (confirm(`¿Eliminar el combo "${c.name || 'sin nombre'}"?`)) removeCombo(i, ci); }}
+                      aria-label="Eliminar combo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Input
+                    value={c.description}
+                    onChange={(e) => setCombo(i, ci, { description: e.target.value })}
+                    placeholder="Descripción corta del combo (opcional)"
+                    className="h-8 text-xs"
+                  />
+                  {/* Imagen propia del combo (opcional — si no, collage de los productos) */}
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs cursor-pointer hover:bg-gray-50 shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setUploadingIdx(i);
+                          try {
+                            const path = await uploadImage(file, 900, 0.8);
+                            setCombo(i, ci, { image: path });
+                          } catch {
+                            alert('No se pudo subir la imagen. Intenta de nuevo.');
+                          } finally {
+                            setUploadingIdx(null);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      {uploadingIdx === i ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…</>
+                      ) : (
+                        <><ImagePlus className="h-3.5 w-3.5" /> {c.image ? 'Cambiar foto' : 'Foto del combo'}</>
+                      )}
+                    </label>
+                    {c.image ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={c.image} alt="" className="h-10 w-16 object-cover rounded border border-gray-300" />
+                        <Button
+                          variant="ghost" size="icon" type="button"
+                          className="text-red-500 hover:bg-red-50 h-7 w-7 shrink-0"
+                          onClick={() => setCombo(i, ci, { image: undefined })}
+                          aria-label="Quitar foto del combo"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-gray-400 leading-snug">Sin foto → se muestra el collage de los productos</p>
+                    )}
+                  </div>
+                  {/* Selección multi-producto del combo */}
+                  <div className="rounded border border-gray-200 bg-gray-50/60 p-2">
+                    <p className="text-[11px] font-semibold text-gray-600 mb-1.5">
+                      Productos del combo ({c.productIds.length} seleccionado{c.productIds.length === 1 ? '' : 's'})
+                      {c.productIds.length > 1 && comboTotal > 0 && (
+                        <span className="ml-1 font-bold text-pink-700">
+                          · suma ₱{comboTotal.toLocaleString('es-CU')}
+                          {c.discountPct > 0 && (
+                            <span className="text-green-700"> → ₱{Math.round(comboTotal * (1 - c.discountPct / 100)).toLocaleString('es-CU')} con -{c.discountPct}%</span>
+                          )}
+                        </span>
+                      )}
+                    </p>
+                    {c.productIds.length < 2 && (
+                      <p className="text-[10px] text-amber-600 mb-1">⚠️ Elige al menos 2 productos para que sea un combo.</p>
+                    )}
+                    <div className="max-h-44 overflow-y-auto space-y-1">
+                      {catalog.length === 0 && <p className="text-xs text-gray-400">Cargando catálogo…</p>}
+                      {catalog.map((p) => {
+                        const checked = c.productIds.includes(p.id);
+                        return (
+                          <label key={p.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-white cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setCombo(i, ci, {
+                                  productIds: e.target.checked
+                                    ? [...c.productIds, p.id]
+                                    : c.productIds.filter((id) => id !== p.id),
+                                })
+                              }
+                              className="accent-pink-600 h-4 w-4"
+                            />
+                            {p.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.image} alt="" className="h-7 w-7 rounded object-cover" />
+                            ) : (
+                              <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-sm">🧁</div>
+                            )}
+                            <span className="text-xs flex-1 truncate">{p.name}</span>
+                            <span className="text-xs text-gray-500 shrink-0">₱{p.price.toLocaleString('es-CU')}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legacy: productos sueltos de la fecha (formato anterior) */}
           <details className="rounded-md border border-gray-200 bg-white px-3 py-2">
-            <summary className="text-xs font-semibold cursor-pointer select-none">
-              🎁 Combos de esta fecha ({r.productIds.length} {r.productIds.length === 1 ? 'producto' : 'productos'})
+            <summary className="text-xs font-semibold cursor-pointer select-none text-gray-500">
+              🧺 Productos sueltos — formato anterior ({r.productIds.length} {r.productIds.length === 1 ? 'producto' : 'productos'})
             </summary>
+            <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+              Se muestran como mini-cards bajo la promoción. Para el nuevo formato (cards de combo multi-producto) usa
+              la sección de Combos de arriba.
+            </p>
             <div className="mt-2 max-h-56 overflow-y-auto space-y-1">
               {catalog.length === 0 && <p className="text-xs text-gray-400">Cargando catálogo…</p>}
               {catalog.map((p) => {
@@ -697,7 +934,7 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
       ))}
       <Button
         variant="outline" size="sm" type="button"
-        onClick={() => emit([...rows, { name: '', emoji: '🎉', month: 0, day: 1, description: '', theme: 'morado', active: true, order: rows.length, productIds: [] }])}
+        onClick={() => emit([...rows, { name: '', emoji: '🎉', month: 0, day: 1, description: '', theme: 'morado', active: true, order: rows.length, productIds: [], combos: [newComboRow(0)] }])}
       >
         <Plus className="h-4 w-4 mr-1" /> Agregar fecha especial
       </Button>
@@ -7136,20 +7373,10 @@ function SettingsTab() {
                 <Sparkles className="h-5 w-5 text-brand" />
                 🎨 Servicios para Eventos
               </CardTitle>
-              <p className="text-sm text-gray-500">Gestiona los servicios que ofreces para eventos (decoración, entretenimiento, sueños sorpresa, etc.). Se crean/editan desde la pestaña Productos → Servicios.</p>
+              <p className="text-sm text-gray-500">Gestiona los servicios para eventos: nombre, descripción, precios CUP/USD, categoría, orden y la <strong>foto protagonista</strong> de la card vertical (pullover personalizado, muñeca sorpresa, decoración…). Se muestran en la sección Servicios y en el modal de reserva de eventos.</p>
             </CardHeader>
             <CardContent>
-              <div className="rounded-xl p-4" style={{ background: '#F3E8FF', border: '1px solid #DDD6FE' }}>
-                <p className="text-sm" style={{ color: '#2E1065' }}>
-                  Los servicios se gestionan desde <strong>Productos → Servicios</strong> en el menú lateral. Allí puedes:
-                </p>
-                <ul className="text-xs mt-2 space-y-1" style={{ color: '#4B5563' }}>
-                  <li>• Crear nuevos servicios con nombre, descripción, precio CUP/USD e imagen</li>
-                  <li>• Activar/desactivar servicios</li>
-                  <li>• Reordenar servicios</li>
-                  <li>• Categorizar (decoración, entretenimiento, personalizado, sueños sorpresa)</li>
-                </ul>
-              </div>
+              <ServicesManager />
             </CardContent>
           </Card>
 

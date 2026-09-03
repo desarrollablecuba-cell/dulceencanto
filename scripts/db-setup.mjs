@@ -176,19 +176,19 @@ async function sembrarExtras() {
   await prisma.galleryItem.deleteMany({});
 
   const serviciosData = [
-    ['srv-decoracion', 'Decoración del Evento', 'Decoración completa del salón: centros de mesa, guirnaldas, telas, iluminación temática y ambientación según la ocasión.', '🎨', 'decoracion', 5000, 0],
-    ['srv-munecos', 'Muñecos Sorpresa', 'Muñecos sorpresa de personajes infantiles y de moda. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.', '🧸', 'entretenimiento', 2500, 1],
-    ['srv-canon', 'Cañón de Confeti', 'Cañones de confeti para la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.', '🎉', 'entretenimiento', 1200, 2],
-    ['srv-burbujas', 'Máquina de Burbujas', 'Máquina profesional de burbujas continua durante 2 horas. Magia visual para fotos y momento de baile.', '🫧', 'entretenimiento', 1500, 3],
-    ['srv-caja-regalo', 'Caja de Regalos Personalizada', 'Caja decorada a mano con productos a tu elección: tartas mini, galletas, cupcakes y detalles personalizados.', '🎁', 'decoracion', 1800, 4],
-    ['srv-vela-volcanica', 'Vela Volcánica', 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.', '🌋', 'entretenimiento', 800, 5],
-    ['srv-globos', 'Decoración con Globos', 'Arcos, columnas y bouquets de globos con colores temáticos. Globos helados para un toque premium.', '🎈', 'decoracion', 2200, 6],
-    ['srv-sublimacion', 'Sublimación de Pullovers', 'Pullovers personalizados con el nombre, foto o temática del evento. Recuerdos únicos para los invitados.', '👕', 'personalizado', 1200, 7],
-    ['srv-jarras', 'Jarras Personalizadas', 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.', '🫗', 'personalizado', 1500, 8],
-    ['srv-gigantografias', 'Gigantografías', 'Impresión gran formato para fotos de cuerpo entero, fondos de escenario o banners. Hasta 2x3 metros.', '🖼️', 'decoracion', 2000, 9],
+    ['srv-decoracion', 'Decoración del Evento', 'Decoración completa del salón: centros de mesa, guirnaldas, telas, iluminación temática y ambientación según la ocasión.', '🎨', 'decoracion', 5000, 0, '/services/srv-decoracion.webp'],
+    ['srv-munecos', 'Muñecos Sorpresa', 'Muñecos sorpresa de personajes infantiles y de moda — payasitas humanas, personajes y animación. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.', '🧸', 'entretenimiento', 2500, 1, '/services/srv-munecos.webp'],
+    ['srv-canon', 'Cañón de Confeti', 'Cañones de confeti para la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.', '🎉', 'entretenimiento', 1200, 2, '/services/srv-canon.webp'],
+    ['srv-burbujas', 'Máquina de Burbujas', 'Máquina profesional de burbujas continua durante 2 horas. Magia visual para fotos y momento de baile.', '🫧', 'entretenimiento', 1500, 3, '/services/srv-burbujas.webp'],
+    ['srv-caja-regalo', 'Caja de Regalos Personalizada', 'Caja decorada a mano con productos a tu elección: tartas mini, galletas, cupcakes y detalles personalizados.', '🎁', 'decoracion', 1800, 4, '/services/srv-caja-regalo.webp'],
+    ['srv-vela-volcanica', 'Vela Volcánica', 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.', '🌋', 'entretenimiento', 800, 5, '/services/srv-vela-volcanica.webp'],
+    ['srv-globos', 'Decoración con Globos', 'Arcos, columnas y bouquets de globos con colores temáticos. Globos helados para un toque premium.', '🎈', 'decoracion', 2200, 6, '/services/srv-globos.webp'],
+    ['srv-sublimacion', 'Sublimación de Pullovers', 'Pullovers personalizados con el nombre, foto o temática del evento — sublimación real de alta calidad. Recuerdos únicos para los invitados.', '👕', 'personalizado', 1200, 7, '/services/srv-sublimacion.webp'],
+    ['srv-jarras', 'Jarras Personalizadas', 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.', '🫗', 'personalizado', 1500, 8, '/services/srv-jarras.webp'],
+    ['srv-gigantografias', 'Gigantografías', 'Impresión gran formato para fotos de cuerpo entero, fondos de escenario o banners. Hasta 2x3 metros.', '🖼️', 'decoracion', 2000, 9, '/services/srv-gigantografias.webp'],
   ];
-  for (const [id, name, description, icon, category, price, order] of serviciosData) {
-    await prisma.service.create({ data: { id, name, description, icon, category, image: '', price, priceUsd: cupToUsd(price), active: true, order, createdAt: now, updatedAt: now } });
+  for (const [id, name, description, icon, category, price, order, image] of serviciosData) {
+    await prisma.service.create({ data: { id, name, description, icon, category, image: image || '', price, priceUsd: cupToUsd(price), active: true, order, createdAt: now, updatedAt: now } });
   }
 
   const anio = new Date().getFullYear();
@@ -482,6 +482,59 @@ async function sembrarImagenesSecciones() {
 
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
 console.log('═══════════════════════════════════════════════════════');
+
+// ─── V52: fotos de servicios + specialDates con combos (idempotente) ────────
+// Se aplica en CADA arranque sobre BDs existentes:
+//  1. Completa la imagen de los 10 servicios conocidos SOLO si está vacía
+//     (no pisa fotos subidas por el admin).
+//  2. Si SiteConfig.specialDates está vacío/[], siembra las fechas con los
+//     combos demo (Día de las Madres, Día de los Padres). Si el admin ya
+//     configuró sus fechas, NO se toca nada.
+async function sembrarV52Combos() {
+  // 1) Fotos de servicios
+  const imgs = {
+    'srv-decoracion': '/services/srv-decoracion.webp',
+    'srv-munecos': '/services/srv-munecos.webp',
+    'srv-canon': '/services/srv-canon.webp',
+    'srv-burbujas': '/services/srv-burbujas.webp',
+    'srv-caja-regalo': '/services/srv-caja-regalo.webp',
+    'srv-vela-volcanica': '/services/srv-vela-volcanica.webp',
+    'srv-globos': '/services/srv-globos.webp',
+    'srv-sublimacion': '/services/srv-sublimacion.webp',
+    'srv-jarras': '/services/srv-jarras.webp',
+    'srv-gigantografias': '/services/srv-gigantografias.webp',
+  };
+  let fotos = 0;
+  for (const [id, image] of Object.entries(imgs)) {
+    try {
+      const s = await prisma.service.findUnique({ where: { id }, select: { image: true } });
+      if (s && !s.image) {
+        await prisma.service.update({ where: { id }, data: { image, updatedAt: now } });
+        fotos++;
+      }
+    } catch { /* servicio inexistente → seguir */ }
+  }
+  if (fotos > 0) console.log(`[v52] ✓ ${fotos} servicios con foto protagonista aplicada`);
+
+  // 2) specialDates con combos (solo si nunca se configuraron)
+  try {
+    const cfg = await prisma.siteConfig.findUnique({ where: { id: 'site' }, select: { specialDates: true } });
+    const vacio = !cfg?.specialDates || cfg.specialDates.trim() === '' || cfg.specialDates.trim() === '[]';
+    if (vacio) {
+      const fechas = JSON.parse(readFileSync(path.join(process.cwd(), 'data', 'seed-special-dates.json'), 'utf-8'));
+      await prisma.siteConfig.update({
+        where: { id: 'site' },
+        data: { specialDates: JSON.stringify(fechas), updatedAt: now },
+      });
+      console.log(`[v52] ✓ specialDates con ${fechas.length} fechas y combos sembradas`);
+    } else {
+      console.log('[v52] = specialDates ya configuradas por el admin (no se tocan)');
+    }
+  } catch (e) {
+    console.log('[v52] ⚠️ specialDates: ' + String(e?.message || e).slice(0, 120));
+  }
+}
+
 console.log('  🗄️  DB SETUP — Dulce Encanto (Node puro)');
 console.log('═══════════════════════════════════════════════════════');
 // Cada bloque corre INDEPENDIENTE: si uno falla, los demás siguen
@@ -498,6 +551,7 @@ const bloques = [
   ['imágenes de categorías', sembrarImagenesCategorias],
   ['galería v2 (portadas+fotos)', sembrarGaleria],
   ['imágenes de secciones', sembrarImagenesSecciones],
+  ['v52: fotos servicios + combos', sembrarV52Combos],
 ];
 const fallidos = [];
 for (const [nombre, fn] of bloques) {

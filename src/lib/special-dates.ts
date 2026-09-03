@@ -11,6 +11,30 @@
  *  `gradient`/`accent` son los valores resueltos que consume el countdown.
  *  `image` (opcional): imagen de fondo de la tarjeta (subida desde el admin).
  */
+/**
+ * Combo de promoción (v2):
+ * un combo se conforma en el admin eligiendo MÁS DE UN producto de la
+ * tienda. Se muestra como una card vertical dentro de la card de la
+ * promoción (ej: "Día de las Madres"), con el collage de las fotos de
+ * los productos, el total y el descuento opcional.
+ */
+export interface SpecialDateCombo {
+  /** uid estable (para React keys y edición en el admin). */
+  id: string;
+  name: string;
+  description?: string;
+  /** Imagen propia del combo (opcional; si no, collage de los productos). */
+  image?: string;
+  /** Descuento opcional 0-100% sobre la suma de los productos. */
+  discountPct?: number;
+  /** IDs de productos que conforman el combo (2+ recomendado). */
+  productIds: string[];
+  /** Toggle del admin: solo combos con active!==false se muestran. */
+  active?: boolean;
+  /** Orden manual dentro de la promoción. */
+  order?: number;
+}
+
 export interface SpecialDate {
   month: number;  // 0-11 (Jan=0)
   day: number;    // 1-31
@@ -27,6 +51,12 @@ export interface SpecialDate {
   order?: number;
   /** "Combos": ids de productos de la tienda agrupados para esta fecha. */
   productIds?: string[];
+  /**
+   * Combos de promoción (v2): cards de combo (multi-producto) que se
+   * muestran DENTRO de la card de esta promoción. Configurables desde
+   * el admin (Ajustes → Inicio → Fechas Especiales).
+   */
+  combos?: SpecialDateCombo[];
 }
 
 export const DEFAULT_SPECIAL_DATES: SpecialDate[] = [
@@ -37,7 +67,31 @@ export const DEFAULT_SPECIAL_DATES: SpecialDate[] = [
   {
     month: 4, day: 11, name: 'Día de las Madres', emoji: '👩‍👧',
     description: 'Celebra a mamá con la tarta favorita, un combo de dulces finos y un detalle personalizado.',
-    theme: 'morado', gradient: 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)', accent: '#C084FC', order: 1, productIds: [] },
+    theme: 'morado', gradient: 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)', accent: '#C084FC', order: 1, productIds: [],
+    combos: [
+      {
+        id: 'combo-mama-querida', name: 'Combo Mamá Querida',
+        description: 'Cake de bandeja de rosas + vasos de tres leches + galleticas: la celebración completa de mamá.',
+        discountPct: 15,
+        productIds: ['de-prod-40', 'de-prod-21', 'de-prod-4'],
+        active: true, order: 0,
+      },
+      {
+        id: 'combo-detalle-dulce', name: 'Combo Detalle Dulce',
+        description: 'Cheesecakes de queso + cupcakes bicolor: un detalle elegante que enamora.',
+        discountPct: 10,
+        productIds: ['de-prod-22', 'de-prod-14'],
+        active: true, order: 1,
+      },
+      {
+        id: 'combo-celebra-grande', name: 'Combo Celebra en Grande',
+        description: 'Torta sencilla de rosas + vasos surtidos + marquesitas: para toda la familia.',
+        discountPct: 12,
+        productIds: ['de-prod-28', 'de-prod-23', 'de-prod-18'],
+        active: true, order: 2,
+      },
+    ],
+  },
   {
     month: 6, day: 15, name: 'Día de los Niños', emoji: '🧒',
     description: 'Tartas temáticas de personajes, máquina de burbujas, decoración colorida. Diversión asegurada.',
@@ -45,7 +99,17 @@ export const DEFAULT_SPECIAL_DATES: SpecialDate[] = [
   {
     month: 8, day: 8, name: 'Día de los Padres', emoji: '👨',
     description: 'Tartas temáticas de fútbol, sublimación de pullovers y detalles para papá.',
-    theme: 'azul', gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', accent: '#60A5FA', order: 3, productIds: [] },
+    theme: 'azul', gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', accent: '#60A5FA', order: 3, productIds: [],
+    combos: [
+      {
+        id: 'combo-papa-feliz', name: 'Combo Papá Feliz',
+        description: 'Brazo gitano de chocolate + berlinesas rellenas: el dulce favorito de papá.',
+        discountPct: 10,
+        productIds: ['de-prod-25', 'de-prod-10'],
+        active: true, order: 0,
+      },
+    ],
+  },
   {
     month: 9, day: 10, name: 'Día de la Mujer Cubana', emoji: '🌹',
     description: 'Honra a las mujeres de tu vida con postres elegantes, tartas florales y detalles únicos.',

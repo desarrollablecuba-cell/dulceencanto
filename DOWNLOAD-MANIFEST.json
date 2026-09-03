@@ -1,11 +1,11 @@
 {
   "project": "dulce-encanto",
-  "packageVersion": "V51",
-  "appVersion": "51.0.0",
-  "generatedAt": "2026-09-03T01:02:37.861Z",
-  "fileCount": 370,
-  "uncompressedBytes": 8092552,
-  "sha256Fingerprint": "d6d4eff73cf81778c720c8c6199948132e40c3f89e84ba7a012875350e4d0276",
+  "packageVersion": "V52",
+  "appVersion": "52.0.0",
+  "generatedAt": "2026-09-03T03:12:18.173Z",
+  "fileCount": 383,
+  "uncompressedBytes": 9139819,
+  "sha256Fingerprint": "6e069022b1be7255b142879c3e9c1ceb0fd6eec1a9ed716b50af9a00dea194d8",
   "source": "Código REAL del sandbox en el momento de la descarga (sin caché)",
-  "verifyInDeploy": "Abre /api/health en Railway → appVersion debe ser \"51.0.0\""
+  "verifyInDeploy": "Abre /api/health en Railway → appVersion debe ser \"52.0.0\""
 }

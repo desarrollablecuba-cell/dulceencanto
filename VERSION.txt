@@ -1,22 +1,29 @@
 ════════════════════════════════════════════════════════════
  DULCE ENCANTO — PAQUETE DE DESPLIEGUE (Railway MySQL)
 ════════════════════════════════════════════════════════════
-Versión del paquete : V51
-Versión de la app   : 51.0.0 (package.json)
-Generado            : 2026-09-03T01:02:37.861Z (UTC)
-Archivos incluidos  : 370
-Tamaño (sin comprimir): 7.7 MB
-Fingerprint SHA-256 : d6d4eff73cf81778c720c8c6199948132e40c3f89e84ba7a012875350e4d0276
+Versión del paquete : V52
+Versión de la app   : 52.0.0 (package.json)
+Generado            : 2026-09-03T03:12:18.173Z (UTC)
+Archivos incluidos  : 383
+Tamaño (sin comprimir): 8.7 MB
+Fingerprint SHA-256 : 6e069022b1be7255b142879c3e9c1ceb0fd6eec1a9ed716b50af9a00dea194d8
 Fuente              : código REAL del proyecto al generar el ZIP
 
 CÓMO COMPROBAR QUE DEPLOYASTE ESTA VERSIÓN
  1. Abre  https://TU-APP.up.railway.app/api/health
- 2. Debe mostrar  "appVersion": "51.0.0"  y  "status": "ok"
+ 2. Debe mostrar  "appVersion": "52.0.0"  y  "status": "ok"
  3. Si los counts de tables salen en 0 o status=error, lee el campo
     "hint" del JSON y los logs de arranque en Railway
     ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).
 
-ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO:
+ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO (V52):
+ - Servicios para Eventos: cards VERTICALES con foto protagonista
+   real (pullover personalizado, payasita humana, decoración, globos…)
+   + gestión completa desde el admin (crear/editar/ordenar/subir foto)
+ - Promociones v2: card de la promoción (ej: Día de las Madres) con
+   las cards de los COMBOS dentro — cada combo se conforma desde el
+   admin eligiendo MÁS DE UN producto (suma de precios + descuento).
+   El cliente puede pedir el combo completo de un clic.
  - Galería v2: portadas por categoría + carrusel + lightbox gigante
  - Imágenes de secciones configurables (sembradas en BD + subida admin)
  - Dock de navegación móvil + header compacto
@@ -24,8 +31,10 @@ ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO:
  - Precios: pasteles 120/140 USD · tortas 30/40/60 USD
  - Moneda USD por defecto; venta directa siempre en CUP
  - Logo oficial + favicon sin fondo blanco
- - Autorreparación de BD al arrancar (columnas/tablas faltantes)
+ - Autorreparación de BD al arrancar (columnas/tablas faltantes
+   + fotos de servicios y specialDates con combos en BDs existentes)
  - /api/health para diagnóstico del deploy
+ - /api/download genera este paquete con versionado incremental
 
 DESPLEGAR: ver DEPLOY-RAILWAY.md
 ════════════════════════════════════════════════════════════
