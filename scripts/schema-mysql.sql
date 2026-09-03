@@ -341,6 +341,7 @@ CREATE TABLE IF NOT EXISTS `SiteConfig` (
     `howItWorksSteps` LONGTEXT NOT NULL DEFAULT (''),
     `navSections` LONGTEXT NOT NULL DEFAULT (''),
     `hamburgerItems` LONGTEXT NOT NULL DEFAULT (''),
+    `sectionImages` LONGTEXT NOT NULL DEFAULT (''),
     `createdAt` VARCHAR(191) NOT NULL DEFAULT '',
     `updatedAt` VARCHAR(191) NOT NULL DEFAULT '',
 
@@ -461,8 +462,11 @@ ALTER TABLE `OrderItem` ADD CONSTRAINT `OrderItem_orderId_fkey` FOREIGN KEY (`or
 ALTER TABLE `EventReservationItem` ADD CONSTRAINT `EventReservationItem_reservationId_fkey` FOREIGN KEY (`reservationId`) REFERENCES `EventReservation`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 
--- Columna specialDates (SiteConfig) para despliegues donde la tabla ya existia
+-- Columnas para despliegues donde la tabla ya existia (en BD frescas fallan
+-- con "Duplicate column" errno 1060, que db-setup.mjs tolera por diseño)
 ALTER TABLE `SiteConfig` ADD COLUMN `specialDates` LONGTEXT;
+ALTER TABLE `Category` ADD COLUMN `section` VARCHAR(191) NOT NULL DEFAULT 'ambas';
+ALTER TABLE `SiteConfig` ADD COLUMN `minOrderAmount` DOUBLE NOT NULL DEFAULT 10;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- GALERÍA POR CATEGORÍAS (v2) + IMÁGENES DE SECCIONES CONFIGURABLES
@@ -506,4 +510,6 @@ CREATE TABLE IF NOT EXISTS `GalleryPhoto` (
 ALTER TABLE `GalleryPhoto` ADD CONSTRAINT `GalleryPhoto_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `GalleryCategory`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Imágenes configurables de las secciones del home (JSON {id: url})
-ALTER TABLE `SiteConfig` ADD COLUMN `sectionImages` LONGTEXT NOT NULL DEFAULT '';
+-- ⚠️ En MySQL 8 los LONGTEXT solo admiten defaults literales ENTRE PARÉNTESIS.
+-- Un DEFAULT '' sin paréntesis dispara el error 1101 y rompe TODO el setup.
+ALTER TABLE `SiteConfig` ADD COLUMN `sectionImages` LONGTEXT NOT NULL DEFAULT ('');

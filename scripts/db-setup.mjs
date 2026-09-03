@@ -53,14 +53,57 @@ async function crearTablas() {
       }
     }
   }
-  // Verificación: las 19 tablas críticas deben responder
+  // Verificación: las tablas críticas deben responder (incluida la galería v2)
   const checks = [
     () => prisma.admin.count(), () => prisma.product.count(), () => prisma.siteConfig.count(),
     () => prisma.service.count(), () => prisma.promotion.count(), () => prisma.galleryItem.count(),
+    () => prisma.galleryCategory.count(), () => prisma.galleryPhoto.count(),
   ];
   for (const c of checks) await c();
   if (fallos > 0) throw new Error(`${fallos} statements DDL fallaron`);
-  console.log('[ddl] ✓ 19 tablas verificadas');
+  console.log('[ddl] ✓ 21 tablas verificadas');
+}
+
+// ─── 1b. AUTORREPARACIÓN DE COLUMNAS (BDs de Railway ya existentes) ────────
+// Los CREATE TABLE IF NOT EXISTS no añaden columnas a tablas que YA existen.
+// Si un deploy anterior creó la BD sin una columna nueva (p.ej. Category.section
+// o SiteConfig.sectionImages), TODAS las queries de Prisma fallarían con P2022
+// ("column does not exist") y la web se vería "sin conexión a la BD".
+// Este paso compara information_schema contra el manifiesto y añade lo que falte.
+const COLUMNAS_CRITICAS = [
+  ['Category', 'section', "ALTER TABLE `Category` ADD COLUMN `section` VARCHAR(191) NOT NULL DEFAULT 'ambas'"],
+  ['SiteConfig', 'sectionImages', "ALTER TABLE `SiteConfig` ADD COLUMN `sectionImages` LONGTEXT NOT NULL DEFAULT ('')"],
+  ['SiteConfig', 'specialDates', 'ALTER TABLE `SiteConfig` ADD COLUMN `specialDates` LONGTEXT'],
+  ['SiteConfig', 'minOrderAmount', 'ALTER TABLE `SiteConfig` ADD COLUMN `minOrderAmount` DOUBLE NOT NULL DEFAULT 10'],
+  ['SiteConfig', 'heroSlides', "ALTER TABLE `SiteConfig` ADD COLUMN `heroSlides` LONGTEXT NOT NULL DEFAULT ('')"],
+  ['SiteConfig', 'navSections', "ALTER TABLE `SiteConfig` ADD COLUMN `navSections` LONGTEXT NOT NULL DEFAULT ('')"],
+  ['SiteConfig', 'hamburgerItems', "ALTER TABLE `SiteConfig` ADD COLUMN `hamburgerItems` LONGTEXT NOT NULL DEFAULT ('')"],
+  ['SiteConfig', 'howItWorksSteps', "ALTER TABLE `SiteConfig` ADD COLUMN `howItWorksSteps` LONGTEXT NOT NULL DEFAULT ('')"],
+];
+
+async function verificarColumnasCriticas() {
+  const url = process.env.DATABASE_URL || '';
+  const schemaName = url.split('?')[0].split('/').pop() || 'railway';
+  let reparadas = 0;
+  for (const [table, col, alter] of COLUMNAS_CRITICAS) {
+    try {
+      const rows = await prisma.$queryRawUnsafe(
+        'SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+        schemaName, table, col
+      );
+      if (Number(rows[0]?.n) === 0) {
+        await prisma.$executeRawUnsafe(alter);
+        console.log(`[ddl-fix] ✓ ${table}.${col} AÑADIDA (faltaba en la BD)`);
+        reparadas++;
+      }
+    } catch (e) {
+      console.error(`[ddl-fix] ✗ ${table}.${col}: ${String(e?.message || e).slice(0, 140)}`);
+      throw e;
+    }
+  }
+  console.log(reparadas > 0
+    ? `[ddl-fix] ✓ ${reparadas} columna(s) reparadas sobre la BD existente`
+    : '[ddl-fix] • todas las columnas críticas ya presentes');
 }
 
 // ─── 2. SEMILLA DULCE ENCANTO (identidad, zonas, admin, config) ─────────────
@@ -438,26 +481,41 @@ async function sembrarImagenesSecciones() {
 }
 
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
-try {
-  console.log('═══════════════════════════════════════════════════════');
-  console.log('  🗄️  DB SETUP — Dulce Encanto (Node puro)');
-  console.log('═══════════════════════════════════════════════════════');
-  await crearTablas();
-  await sembrarDulce();
-  await sembrarSiteConfig();
-  await sembrarExtras();
-  await sembrarCatalogo();
-  await sembrarDulcesFinos();
-  await sembrarImagenesCategorias();
-  await sembrarGaleria();
-  await sembrarImagenesSecciones();
-  console.log('═══════════════════════════════════════════════════════');
-  console.log('  ✅ DB SETUP COMPLETO');
-  console.log('═══════════════════════════════════════════════════════');
-  process.exit(0);
-} catch (e) {
-  console.error('❌ DB SETUP FALLO:', String(e?.message || e).slice(0, 300));
-  process.exit(1);
-} finally {
-  await prisma.$disconnect().catch(() => {});
+console.log('═══════════════════════════════════════════════════════');
+console.log('  🗄️  DB SETUP — Dulce Encanto (Node puro)');
+console.log('═══════════════════════════════════════════════════════');
+// Cada bloque corre INDEPENDIENTE: si uno falla, los demás siguen
+// (antes, un fallo en galería dejaba la BD a medio sembrar y el resto
+//  de las secciones de la web aparecía vacía en Railway).
+const bloques = [
+  ['tablas + columnas', crearTablas],
+  ['autorreparación columnas', verificarColumnasCriticas],
+  ['identidad (admin/zonas)', sembrarDulce],
+  ['siteconfig (hero/banner/etc)', sembrarSiteConfig],
+  ['servicios/promos/galería', sembrarExtras],
+  ['catálogo', sembrarCatalogo],
+  ['dulces finos + precios', sembrarDulcesFinos],
+  ['imágenes de categorías', sembrarImagenesCategorias],
+  ['galería v2 (portadas+fotos)', sembrarGaleria],
+  ['imágenes de secciones', sembrarImagenesSecciones],
+];
+const fallidos = [];
+for (const [nombre, fn] of bloques) {
+  try {
+    await fn();
+  } catch (e) {
+    fallidos.push(nombre);
+    console.error(`❌ BLOQUE "${nombre}" FALLÓ: ${String(e?.message || e).slice(0, 220)}`);
+  }
 }
+console.log('═══════════════════════════════════════════════════════');
+if (fallidos.length > 0) {
+  console.error(`❌ DB SETUP INCOMPLETO — bloques fallidos: ${fallidos.join(', ')}`);
+  console.error('❌ La app sigue arriba; revisa los logs [ddl]/[dulce]/[config]/[catalogo]/[galeria] de arriba.');
+  await prisma.$disconnect().catch(() => {});
+  process.exit(1);
+}
+console.log('  ✅ DB SETUP COMPLETO');
+console.log('═══════════════════════════════════════════════════════');
+await prisma.$disconnect().catch(() => {});
+process.exit(0);

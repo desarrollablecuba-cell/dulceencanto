@@ -1,0 +1,31 @@
+════════════════════════════════════════════════════════════
+ DULCE ENCANTO — PAQUETE DE DESPLIEGUE (Railway MySQL)
+════════════════════════════════════════════════════════════
+Versión del paquete : V51
+Versión de la app   : 51.0.0 (package.json)
+Generado            : 2026-09-03T01:02:37.861Z (UTC)
+Archivos incluidos  : 370
+Tamaño (sin comprimir): 7.7 MB
+Fingerprint SHA-256 : d6d4eff73cf81778c720c8c6199948132e40c3f89e84ba7a012875350e4d0276
+Fuente              : código REAL del proyecto al generar el ZIP
+
+CÓMO COMPROBAR QUE DEPLOYASTE ESTA VERSIÓN
+ 1. Abre  https://TU-APP.up.railway.app/api/health
+ 2. Debe mostrar  "appVersion": "51.0.0"  y  "status": "ok"
+ 3. Si los counts de tables salen en 0 o status=error, lee el campo
+    "hint" del JSON y los logs de arranque en Railway
+    ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).
+
+ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO:
+ - Galería v2: portadas por categoría + carrusel + lightbox gigante
+ - Imágenes de secciones configurables (sembradas en BD + subida admin)
+ - Dock de navegación móvil + header compacto
+ - Dulces Finos (13 × 40 USD/docena) en sección Por Reserva
+ - Precios: pasteles 120/140 USD · tortas 30/40/60 USD
+ - Moneda USD por defecto; venta directa siempre en CUP
+ - Logo oficial + favicon sin fondo blanco
+ - Autorreparación de BD al arrancar (columnas/tablas faltantes)
+ - /api/health para diagnóstico del deploy
+
+DESPLEGAR: ver DEPLOY-RAILWAY.md
+════════════════════════════════════════════════════════════

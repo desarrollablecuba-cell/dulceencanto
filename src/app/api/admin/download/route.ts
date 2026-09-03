@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createProjectZip } from '@/lib/project-zip';
+import { createProjectZip, type ProjectZipSuccess } from '@/lib/project-zip';
 import { requireAdmin, unauthorized } from '@/lib/auth';
 
 export const runtime = 'nodejs';
@@ -57,12 +57,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const zip = result as ProjectZipSuccess;
+
   const headers = new Headers();
   headers.set('Content-Type', 'application/zip');
-  headers.set('Content-Disposition', `attachment; filename="${result.filename}"`);
-  headers.set('Content-Length', String(result.buffer.length));
-  headers.set('X-File-Count', String(result.fileCount));
+  headers.set('Content-Disposition', `attachment; filename="${zip.filename}"`);
+  headers.set('Content-Length', String(zip.buffer.length));
+  headers.set('X-File-Count', String(zip.fileCount));
+  headers.set('X-Version', zip.version);
   headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-  return new NextResponse(new Uint8Array(result.buffer), { status: 200, headers });
+  return new NextResponse(new Uint8Array(zip.buffer), { status: 200, headers });
 }

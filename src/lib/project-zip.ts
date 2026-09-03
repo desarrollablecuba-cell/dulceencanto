@@ -24,7 +24,7 @@ import { deflateRawSync } from 'node:zlib';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 
 // ─── Configuración del empaquetado ─────────────────────────────────────────
@@ -74,7 +74,41 @@ export interface ProjectZipResult {
   buffer?: Buffer;
   fileCount?: number;
   error?: string;
+  version?: string;
 }
+
+// ─── Versionado V50+ (persistente, +1 por descarga) ─────────────────────
+//
+// El usuario pidió: "ponle V50 a partir de ahora a este .zip y luego vas
+// aumentando con cada descarga". El contador vive en db/download-version.json
+// (db/ NUNCA entra al ZIP ni al repo) y sobrevive a reinicios del server.
+
+const VERSION_FILE = path.join(PROJECT_ROOT, 'db', 'download-version.json');
+const VERSION_INICIAL = 50;
+const HISTORIAL_MAX = 30;
+
+interface VersionState {
+  next: number;
+  historial: { version: number; fecha: string; archivos: number; bytesZip: number }[];
+}
+
+async function readVersionState(): Promise<VersionState> {
+  try {
+    const st = JSON.parse(await fs.readFile(VERSION_FILE, 'utf-8'));
+    if (typeof st.next === 'number' && st.next >= VERSION_INICIAL) return st as VersionState;
+  } catch {
+    // primera vez o archivo corrupto → empezar en V50
+  }
+  return { next: VERSION_INICIAL, historial: [] };
+}
+
+async function writeVersionState(st: VersionState): Promise<void> {
+  await fs.mkdir(path.dirname(VERSION_FILE), { recursive: true });
+  await fs.writeFile(VERSION_FILE, JSON.stringify(st, null, 2), 'utf-8');
+}
+
+// Serializa las descargas: cada una recibe SU número (V50, V51, …) sin carreras.
+let downloadLock: Promise<unknown> = Promise.resolve();
 
 // ─── Writer ZIP puro en JavaScript (deflate) ────────────────────────────────
 
@@ -315,6 +349,101 @@ async function collectFiles(
   return out;
 }
 
+// ─── Verificación anti-staleness (garantía de "código real de la última versión") ───
+//
+// Cada ZIP se autoverifica ANTES de servirse: si falta cualquiera de estos
+// archivos (o el contenido esperado), la descarga FALLA con error claro en
+// vez de entregar un paquete viejo incompleto.
+
+const REQUIRED_LATEST: [string, RegExp?][] = [
+  // Galería v2 (portadas + carrusel + lightbox) — API y frontend
+  ['src/components/ecommerce/GallerySection.tsx'],
+  ['src/app/api/admin/gallery/route.ts'],
+  ['src/app/api/admin/gallery/photos/route.ts'],
+  ['src/app/api/admin/gallery/upload/route.ts'],
+  ['scripts/seed-gallery.ts'],
+  ['prisma/migrations/20260903000001_gallery_categories/migration.sql'],
+  // Secciones con imagen configurable
+  ['src/app/api/admin/sections/upload/route.ts'],
+  ['src/lib/section-images.ts'],
+  // Dock móvil + fixes de consola
+  ['src/components/ecommerce/MobileNavDock.tsx'],
+  ['src/components/ServiceWorkerCleaner.tsx'],
+  // Subidas de imágenes (bug corregido)
+  ['src/app/api/admin/categories/upload/route.ts'],
+  ['src/app/api/admin/products/upload/route.ts'],
+  // Diagnóstico Railway
+  ['src/app/api/health/route.ts'],
+  // Deploy
+  ['scripts/db-setup.mjs', /verificarColumnasCriticas/],
+  ['scripts/start-railway.mjs'],
+  ['scripts/schema-mysql.sql', /ADD COLUMN `section` VARCHAR\(191\)/],
+  ['prisma/migrations/20260903000000_add_category_section/migration.sql'],
+  ['data/scraped-products.json'],
+  ['data/seed-siteconfig.json'],
+  ['railway.json'],
+  ['nixpacks.toml'],
+  ['Procfile'],
+  ['DEPLOY-RAILWAY.md'],
+];
+
+/** Verifica que las entradas del ZIP contengan el código de la última versión. */
+function verifyLatestCode(entries: ZipEntry[], versionNumber: number): string[] {
+  const map = new Map(entries.map((e) => [e.name, e.data]));
+  const problems: string[] = [];
+
+  for (const [name, re] of REQUIRED_LATEST) {
+    const data = map.get(name);
+    if (!data) {
+      problems.push(`falta ${name}`);
+      continue;
+    }
+    if (re && !re.test(data.toString('utf-8'))) {
+      problems.push(`${name} no contiene el código esperado (¿versión vieja?)`);
+    }
+  }
+
+  // El schema embebido debe ser el MySQL COMPLETO (galería v2 + secciones)
+  const schema = map.get('prisma/schema.prisma')?.toString('utf-8') ?? '';
+  const schemaChecks: [string, RegExp][] = [
+    ['model GalleryCategory', /model\s+GalleryCategory\s*\{/],
+    ['model GalleryPhoto', /model\s+GalleryPhoto\s*\{/],
+    ['sectionImages (SiteConfig)', /sectionImages\s+String\s+@db\.LongText/],
+    ['section (Category)', /section\s+String\s+@default\("ambas"\)/],
+  ];
+  for (const [label, re] of schemaChecks) {
+    if (!re.test(schema)) problems.push(`prisma/schema.prisma sin ${label}`);
+  }
+
+  // El DDL debe reparar BDs antiguas y NO tener LONGTEXT con default sin paréntesis
+  const ddl = map.get('scripts/schema-mysql.sql')?.toString('utf-8') ?? '';
+  if (ddl && !ddl.includes("`sectionImages` LONGTEXT NOT NULL DEFAULT ('')")) {
+    problems.push('schema-mysql.sql sin sectionImages en CREATE SiteConfig (DEFAULT parentizado)');
+  }
+  if (ddl && /LONGTEXT[^,\n]*DEFAULT\s+'[^']*'\s*(?=[,\n])/.test(ddl)) {
+    problems.push('schema-mysql.sql con LONGTEXT DEFAULT sin paréntesis (error 1101 en MySQL 8)');
+  }
+
+  // package.json debe llevar la versión del paquete (la muestra /api/health)
+  try {
+    const pkg = JSON.parse(map.get('package.json')?.toString('utf-8') || '{}');
+    if (pkg.version !== `${versionNumber}.0.0`) {
+      problems.push(`package.json version=${pkg.version} != ${versionNumber}.0.0`);
+    }
+  } catch {
+    problems.push('package.json ilegible en el paquete');
+  }
+
+  return problems;
+}
+
+function fingerprintOf(entries: ZipEntry[]): string {
+  const hash = createHash('sha256');
+  const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+  for (const e of sorted) hash.update(`${e.name}:${e.data.length}\n`);
+  return hash.digest('hex');
+}
+
 // ─── API principal ─────────────────────────────────────────────────────────
 
 export interface CreateProjectZipOptions {
@@ -328,21 +457,39 @@ export interface ProjectZipSuccess extends ProjectZipResult {
   buffer: Buffer;
   fileCount: number;
   filename: string;
+  version: string;
+  versionNumber: number;
 }
 
 /**
  * Genera el ZIP del proyecto (en memoria) listo para subir a Railway.
  * Nunca lanza: devuelve { ok: false, error } en caso de fallo.
+ *
+ * Cada llamada recibe un número de versión correlativo (V50, V51, …) y el
+ * paquete se AUTOVERIFICA antes de servirse (verifyLatestCode), de modo que
+ * es imposible entregar un paquete sin el código de la última versión.
  */
 export async function createProjectZip(
   options: CreateProjectZipOptions = {}
 ): Promise<ProjectZipSuccess | ProjectZipResult> {
+  // Serializa descargas concurrentes para que cada una reciba su V única.
+  const run = downloadLock.then(() => buildProjectZip(options));
+  downloadLock = run.catch(() => {});
+  return run;
+}
+
+async function buildProjectZip(
+  options: CreateProjectZipOptions
+): Promise<ProjectZipSuccess | ProjectZipResult> {
+  const state = await readVersionState();
+  const versionNumber = state.next;
+  const version = `V${versionNumber}`;
   const tmpDir = path.join(os.tmpdir(), `dulce-zip-${randomUUID().slice(0, 8)}`);
 
   try {
     await fs.mkdir(tmpDir, { recursive: true });
 
-    // 1. Copiar whitelist
+    // 1. Copiar whitelist (código REAL del proyecto en este instante)
     let copied = 0;
     for (const p of INCLUDE_PATHS) {
       if (await copyPath(p, tmpDir)) copied++;
@@ -372,35 +519,115 @@ export async function createProjectZip(
       `[project-zip] Schema Prisma en el ZIP: ${schemaForced ? 'MySQL (forzado para Railway)' : 'el presente en el servidor'}`
     );
 
-    // 4. Manifest opcional
-    if (options.manifest) {
-      try {
-        await fs.writeFile(
-          path.join(tmpDir, 'DOWNLOAD-MANIFEST.json'),
-          JSON.stringify(options.manifest, null, 2),
-          'utf-8'
-        );
-      } catch {
-        // best-effort
-      }
+    // 4. Estampar la versión en package.json del paquete (la muestra /api/health)
+    try {
+      const pkgPath = path.join(tmpDir, 'package.json');
+      const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf-8'));
+      pkg.version = `${versionNumber}.0.0`;
+      await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2), 'utf-8');
+    } catch {
+      // best-effort (la verificación final lo detectaría)
     }
 
     // 5. Recolectar y comprimir (writer JS puro — sin binario zip)
-    const entries = await collectFiles(tmpDir);
-    if (entries.length === 0) {
+    const codeEntries = await collectFiles(tmpDir);
+    if (codeEntries.length === 0) {
       return { ok: false, error: 'El empaquetado no produjo ningún archivo.' };
     }
-    const buffer = buildZipBuffer(entries);
 
-    // 6. Nombre con timestamp
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
-      now.getDate()
-    ).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    // 6. Fingerprint + VERSION.txt + DOWNLOAD-MANIFEST.json como entradas extra
+    const fingerprint = fingerprintOf(codeEntries);
+    const generatedAt = new Date().toISOString();
+    const uncompressedBytes = codeEntries.reduce((n, e) => n + e.data.length, 0);
+
+    const manifest = {
+      ...(options.manifest ?? {}),
+      project: 'dulce-encanto',
+      packageVersion: version,
+      appVersion: `${versionNumber}.0.0`,
+      generatedAt,
+      fileCount: codeEntries.length,
+      uncompressedBytes,
+      sha256Fingerprint: fingerprint,
+      source: 'Código REAL del sandbox en el momento de la descarga (sin caché)',
+      verifyInDeploy: `Abre /api/health en Railway → appVersion debe ser "${versionNumber}.0.0"`,
+    };
+
+    const versionTxt = [
+      '════════════════════════════════════════════════════════════',
+      ' DULCE ENCANTO — PAQUETE DE DESPLIEGUE (Railway MySQL)',
+      '════════════════════════════════════════════════════════════',
+      `Versión del paquete : ${version}`,
+      `Versión de la app   : ${versionNumber}.0.0 (package.json)`,
+      `Generado            : ${generatedAt} (UTC)`,
+      `Archivos incluidos  : ${codeEntries.length}`,
+      `Tamaño (sin comprimir): ${(uncompressedBytes / 1024 / 1024).toFixed(1)} MB`,
+      `Fingerprint SHA-256 : ${fingerprint}`,
+      'Fuente              : código REAL del proyecto al generar el ZIP',
+      '',
+      'CÓMO COMPROBAR QUE DEPLOYASTE ESTA VERSIÓN',
+      ' 1. Abre  https://TU-APP.up.railway.app/api/health',
+      ` 2. Debe mostrar  "appVersion": "${versionNumber}.0.0"  y  "status": "ok"`,
+      ' 3. Si los counts de tables salen en 0 o status=error, lee el campo',
+      '    "hint" del JSON y los logs de arranque en Railway',
+      '    ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).',
+      '',
+      'ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO:',
+      ' - Galería v2: portadas por categoría + carrusel + lightbox gigante',
+      ' - Imágenes de secciones configurables (sembradas en BD + subida admin)',
+      ' - Dock de navegación móvil + header compacto',
+      ' - Dulces Finos (13 × 40 USD/docena) en sección Por Reserva',
+      ' - Precios: pasteles 120/140 USD · tortas 30/40/60 USD',
+      ' - Moneda USD por defecto; venta directa siempre en CUP',
+      ' - Logo oficial + favicon sin fondo blanco',
+      ' - Autorreparación de BD al arrancar (columnas/tablas faltantes)',
+      ' - /api/health para diagnóstico del deploy',
+      '',
+      'DESPLEGAR: ver DEPLOY-RAILWAY.md',
+      '════════════════════════════════════════════════════════════',
+      '',
+    ].join('\n');
+
+    const metaEntries: ZipEntry[] = [
+      { name: 'VERSION.txt', data: Buffer.from(versionTxt, 'utf-8'), mtime: new Date() },
+      {
+        name: 'DOWNLOAD-MANIFEST.json',
+        data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8'),
+        mtime: new Date(),
+      },
+    ];
+
+    // 7. VERIFICACIÓN anti-staleness: sin el código de la última versión NO se sirve
+    const allEntries = [...codeEntries, ...metaEntries];
+    const problems = verifyLatestCode(allEntries, versionNumber);
+    if (problems.length > 0) {
+      console.error('[project-zip] verificación de última versión FALLIDA:', problems);
+      return {
+        ok: false,
+        error: `El paquete no contiene el código de la última versión (${problems.slice(0, 5).join('; ')})`,
+      };
+    }
+
+    const buffer = buildZipBuffer(allEntries);
+    console.log(
+      `[project-zip] ${version} generado: ${allEntries.length} archivos, ${(buffer.length / 1024 / 1024).toFixed(2)} MB zip, fingerprint ${fingerprint.slice(0, 12)}…`
+    );
+
+    // 8. Solo tras una construcción + verificación EXITOSA se consume la versión
+    state.next = versionNumber + 1;
+    state.historial.unshift({
+      version: versionNumber,
+      fecha: generatedAt,
+      archivos: allEntries.length,
+      bytesZip: buffer.length,
+    });
+    if (state.historial.length > HISTORIAL_MAX) state.historial.length = HISTORIAL_MAX;
+    await writeVersionState(state);
+
     const prefix = options.filenamePrefix || 'dulce-encanto';
-    const filename = `${prefix}-${dateStr}.zip`;
+    const filename = `${prefix}-${version}.zip`;
 
-    return { ok: true, buffer, fileCount: entries.length, filename };
+    return { ok: true, buffer, fileCount: allEntries.length, filename, version, versionNumber };
   } catch (err) {
     console.error('[project-zip] error:', err);
     return { ok: false, error: `Error al generar el paquete: ${(err as Error).message}` };

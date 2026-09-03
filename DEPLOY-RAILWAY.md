@@ -5,6 +5,26 @@ explicada y resuelta de forma definitiva.
 
 ---
 
+## 🏷️ Versiones del paquete (V50, V51, …)
+
+Cada descarga desde `/api/download` genera un ZIP **correlativo y
+autoverificado**: `dulce-encanto-V50.zip`, luego `V51`, etc. Dentro del ZIP
+hay un **`VERSION.txt`** con la versión, fecha y fingerprint SHA-256 del
+código. El paquete se autocomprueba antes de servirse: si faltara código de
+la última versión, la descarga falla con error (no se entrega ZIP viejo).
+
+**Cómo comprobar qué versión tienes desplegada en Railway:**
+
+```
+https://TU-APP.up.railway.app/api/health
+```
+
+El JSON muestra `"appVersion": "50.0.0"` (= V50), el estado de la conexión,
+los conteos de cada tabla y si faltan columnas. Es el primer sitio que hay
+que mirar ante cualquier sospecha.
+
+---
+
 ## ⚠️ Causa raíz de "Application failed to respond" (ya resuelta)
 
 Railway **ya no usa Nixpacks** para servicios nuevos: su builder por defecto
@@ -28,10 +48,12 @@ Y si Railway ignorara las tres capas, la capa 4 es manual e infalible
 El script `scripts/start-railway.mjs` al arrancar:
 1. **Levanta el servidor Next.js INMEDIATAMENTE** (escucha el puerto en
    segundos → el healthcheck de Railway pasa al primer intento).
-2. En PARALELO prepara la BD: crea tablas (`prisma db push` con reintentos
-   y timeout por intento) y ejecuta los 3 seeds (solo si la BD está vacía;
-   en redeploys se omiten). Un fallo de BD NO tumba la app: las APIs
-   responden error hasta que la BD quede lista, pero el sitio vive.
+2. En PARALELO ejecuta `scripts/db-setup.mjs` (Node puro, sin CLI de
+   Prisma): crea las 21 tablas, **AUTORREPARA columnas faltantes** en BDs
+   de deploys anteriores (information_schema → ALTER) y siembra todos los
+   datos en bloques INDEPENDIENTES (si uno falla, los demás siguen).
+   Un fallo de BD NO tumba la app, pero deja la web vacía: revisa
+   `/api/health` y los logs si eso ocurre.
 
 Primer arranque: las APIs tardan ~1-2 min en quedar operativas (preparación
 de BD en paralelo). Siguientes: casi instantáneos.
@@ -99,9 +121,11 @@ npm install --include=dev --no-audit --no-fund && npx prisma generate && npm run
 
 ## Paso 7: Verificar
 
-1. `https://tu-app.up.railway.app` → carga la tienda.
-2. `https://tu-app.up.railway.app/api/seed` → debe responder:
-   `"products": 56, "categories": 5, "admins": 1, "siteConfig": "configured"`.
+1. `https://tu-app.up.railway.app` → carga la tienda con hero, banner,
+   catálogo y galería.
+2. `https://tu-app.up.railway.app/api/health` → debe responder
+   `"status": "ok"`, `"appVersion": "50.0.0"` (o superior) y conteos de
+   tablas > 0 (productos: ~69, categorías: 6, galería: 4 categorías/16 fotos).
 3. Admin: `/admin` → `admin@dulceencanto.com` / `DulceAdmin2026!`
    (cambia la contraseña y configura el correo de Zelle).
 
@@ -114,13 +138,34 @@ npm install --include=dev --no-audit --no-fund && npx prisma generate && npm run
 2. **Deployments → abre el deploy → View Logs**:
    - Build falla → pega el error del log de build.
    - En runtime debes ver `🚀 DULCE ENCANTO — Arranque de producción` y
-     `[db] ✓ Tablas verificadas/creadas`. Si no aparece, el start command
+     `[ddl] ✓ 21 tablas verificadas`. Si no aparece, el start command
      no es el nuestro → Paso 6b.
 
+### La web carga pero NO se ve NADA de la BD (ni hero, ni productos, ni galería)
+Síntoma clásico de **BD vacía o sin columnas nuevas** (p. ej. deploys con
+paquetes anteriores a V50). Diagnóstico en 10 segundos:
+
+1. Abre `https://tu-app.up.railway.app/api/health`:
+   - `"status": "degraded"` + counts en 0 → **BD vacía**: los seeds no
+     corrieron. Mira los logs de arranque (`[ddl]`, `[dulce]`, `[config]`,
+     `[catalogo]`, `[galeria]`); corrige la causa y **redeploya** — el
+     arranque siembra solo.
+   - `"missingColumns": [...]` → esta versión **las añade sola** al
+     arrancar (autorreparación). Si persiste tras redeployar, añade
+     `FORCE_SEED=1`, redeploya, y quítala después.
+   - `"status": "error"` → revisa `DATABASE_URL` (Paso 4).
+2. Verifica en el propio ZIP que desplegaste: abre `VERSION.txt` dentro
+del paquete y comprueba que `appVersion` en `/api/health` coincide. Si no
+coincide, Railway desplegó otro commit → fuerza redeploy del correcto.
+
+En V50 el setup también arregla el fallo histórico de MySQL 8
+(`sectionImages LONGTEXT DEFAULT ''` → error 1101) que dejaba la BD **sin
+sembrar**: por eso en deploys anteriores no se veía nada de la BD.
+
 ### BD sin tablas
-En los logs de runtime debe aparecer `[db] Intento 1/15: prisma db push...`.
-- Si dice `Can't reach database server` 15 veces → revisa `DATABASE_URL`
-  (Paso 4). El host debe ser `mysql.railway.internal`.
+En los logs de runtime debe aparecer `node scripts/db-setup.mjs`.
+- Si dice `Can't reach database server` → revisa `DATABASE_URL` (Paso 4).
+  El host debe ser `mysql.railway.internal`.
 - Si ni siquiera aparece `[db]` → no está corriendo nuestro script → Paso 6b.
 
 ### Login admin: "Error interno del servidor"
