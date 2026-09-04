@@ -1,62 +1,17 @@
-import { NextResponse } from 'next/server';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, unauthorized } from '@/lib/auth';
+import { handleAdminImageUpload } from '@/lib/admin-upload';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/admin/categories/upload
+ * POST /api/admin/categories/upload — sube la imagen de una categoría.
  *
- * Sube la imagen/portada de una categoría (multipart/form-data, campo "file").
- * El AdminPanel llama a esta ruta desde Gestión de Categorías y espera
- * { url } en la respuesta.
- * - Requiere token de admin (header Authorization: Bearer o ?token=).
- * - Convierte a WebP con sharp y guarda en public/categories/.
+ * FormData: file (JPG/PNG/WebP/GIF, ≤ 8MB).
+ * Devuelve { url: "/categories/cat-xxx.webp", path } — `url` es el campo que
+ * guarda Category.image (lo consume el AdminPanel con ?token=).
  */
-const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
-
-export async function POST(req: Request) {
-  const admin = requireAdmin(req);
-  if (!admin) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
-
-  try {
-    const formData = await req.formData();
-    const file = formData.get('file');
-
-    if (!file || typeof file === 'string') {
-      return NextResponse.json({ error: 'Falta el archivo' }, { status: 400 });
-    }
-    if (!ALLOWED.includes(file.type)) {
-      return NextResponse.json({ error: 'Formato no válido. Solo JPG, PNG, WebP o GIF.' }, { status: 400 });
-    }
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: 'La imagen supera el máximo de 8MB.' }, { status: 400 });
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    let output = buffer;
-    let ext = 'webp';
-    try {
-      const sharp = (await import('sharp')).default;
-      output = await sharp(buffer).webp({ quality: 82 }).toBuffer();
-    } catch {
-      ext = (file.name.split('.').pop() || 'webp').toLowerCase().replace(/[^a-z0-9]/g, '') || 'webp';
-    }
-
-    const name = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const dir = path.join(process.cwd(), 'public', 'categories');
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, name), output);
-
-    const rel = `/categories/${name}`;
-    return NextResponse.json({ ok: true, path: rel, url: `/api/uploads${rel}` }, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Error al subir la imagen' }, { status: 500 });
-  }
+export async function POST(request: Request) {
+  if (!requireAdmin(request)) return unauthorized();
+  return handleAdminImageUpload(request, { subdir: 'categories', prefix: 'cat', maxW: 700, quality: 84 });
 }

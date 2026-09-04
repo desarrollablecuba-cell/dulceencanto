@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Gift, Tag, Calendar, ShoppingBag, Check, Sparkles, Package, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Gift, Tag, Calendar, ShoppingBag, Check, Sparkles, Package, ChevronRight, MessageCircle, Timer, Share2, X, ChevronLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCartStore } from '@/store/cart-store';
 
@@ -76,6 +77,30 @@ export function PromotionsSection() {
   // ── Combos por fecha especial (configurados en Ajustes → Inicio) ──
   const [specialDates, setSpecialDates] = useState<SpecialDateCfg[]>([]);
   const [products, setProducts] = useState<ProductLite[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [whatsapp, setWhatsapp] = useState('');
+
+  // ── Lightbox de productos del combo (galería gigante) ──
+  const [lightbox, setLightbox] = useState<{ images: string[]; idx: number } | null>(null);
+
+  const lightboxNext = useCallback(() => {
+    setLightbox((lb) => (lb ? { ...lb, idx: (lb.idx + 1) % lb.images.length } : lb));
+  }, []);
+  const lightboxPrev = useCallback(() => {
+    setLightbox((lb) => (lb ? { ...lb, idx: (lb.idx - 1 + lb.images.length) % lb.images.length } : lb));
+  }, []);
+
+  // Navegación con teclado dentro del lightbox
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+      else if (e.key === 'ArrowRight') lightboxNext();
+      else if (e.key === 'ArrowLeft') lightboxPrev();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox, lightboxNext, lightboxPrev]);
 
   useEffect(() => {
     fetch('/api/siteconfig')
@@ -85,6 +110,7 @@ export function PromotionsSection() {
           const parsed = typeof cfg?.specialDates === 'string' ? JSON.parse(cfg.specialDates) : cfg?.specialDates;
           if (Array.isArray(parsed)) setSpecialDates(parsed);
         } catch { /* ignore */ }
+        if (cfg?.whatsappNumber) setWhatsapp(String(cfg.whatsappNumber));
       })
       .catch(() => {});
     fetch('/api/products')
@@ -103,7 +129,8 @@ export function PromotionsSection() {
           );
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
   // Grupos: solo fechas ACTIVAS con combos (v2) o productos legacy asignados,
@@ -159,15 +186,19 @@ export function PromotionsSection() {
     let added = 0;
     let blocked = '';
     for (const it of items) {
+      // V52.7 — canal de venta: sin stock → reservable ($USD); con stock →
+      // venta directa (₡CUP). Los items del combo siguen la misma regla.
+      const mode: 'direct' | 'reservation' = (it.stock ?? 0) <= 0 ? 'reservation' : 'direct';
       const res = addItem({
         productId: it.id,
         name: it.name,
         price: it.price,
         basePrice: it.price,
         image: it.image,
-        stock: it.stock,
-        isReservation: (it.stock ?? 0) <= 0 ? true : undefined,
-        reservationDays: it.reservationDays,
+        stock: mode === 'reservation' ? undefined : it.stock,
+        isReservation: mode === 'reservation' ? true : undefined,
+        saleMode: mode,
+        reservationDays: mode === 'reservation' ? it.reservationDays : undefined,
       });
       if (res.ok) added++;
       else blocked = res.reason || '';
@@ -188,31 +219,85 @@ export function PromotionsSection() {
     }
   };
 
-  if (promos.length === 0 && comboGroups.length === 0) return null;
+  // Compartir un combo por WhatsApp (resumen con productos y precio final)
+  const shareCombo = (comboName: string, items: ProductLite[], finalPrice: number, pct: number, promoName: string) => {
+    const lista = items.slice(0, 4).map((it) => `• ${it.name}`).join('\n');
+    const extra = items.length > 4 ? `\n• … y ${items.length - 4} más\n` : '\n';
+    const msg = `🎁 *${comboName}* — promo de ${promoName} en Dulce Encanto\n\n${lista}${extra}\nTotal: ₱${finalPrice.toLocaleString('es-CU')}${pct > 0 ? ` (−${pct}% descuento)` : ''}\n\n¿Me lo reservan? 🍰`;
+    const url = `https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener');
+    toast({ title: '↗ Compartiendo combo', description: 'Se abrió WhatsApp con el resumen del combo', duration: 2500 });
+  };
+
+  // Compartir la promoción COMPLETA (banner) por WhatsApp: enumera sus combos
+  const sharePromo = (promoName: string, combos: { cfg: SpecialDateComboCfg; items: ProductLite[] }[], fechaStr: string) => {
+    const lines = combos.slice(0, 5).map((c) => {
+      const total = c.items.reduce((n, it) => n + it.price, 0);
+      const pct = Math.min(100, Math.max(0, Number(c.cfg.discountPct) || 0));
+      const final = Math.round(total * (1 - pct / 100));
+      return `• *${c.cfg.name}* — ${c.items.length} productos, ₱${final.toLocaleString('es-CU')}${pct > 0 ? ` (−${pct}%)` : ''}`;
+    }).join('\n');
+    const extra = combos.length > 5 ? `\n• … y ${combos.length - 5} combos más` : '';
+    const msg = `💝 *${promoName}* (${fechaStr}) en Dulce Encanto\n\n${lines}${extra}\n\nMira las promos: pregunta por los combos 🎁`;
+    const url = `https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener');
+    toast({ title: '↗ Compartiendo promoción', description: 'Se abrió WhatsApp con los combos de la promo', duration: 2500 });
+  };
+
+  if (loaded && promos.length === 0 && comboGroups.length === 0) return null;
 
   return (
     <section id="promociones" className="py-16 relative" style={{ background: '#FEF7F0' }}>
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2 px-3 py-1 rounded-full" style={{ background: '#FCE7F3', color: '#BE185D' }}>
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-3 px-4 py-1.5 rounded-full" style={{ background: '#FCE7F3', color: '#BE185D', border: '1px solid #FBCFE8' }}>
             <Tag className="h-3.5 w-3.5" /> Promociones Especiales
           </span>
-          <h2 className="font-bold" style={{ fontSize: '32px', color: '#2E1065', fontFamily: 'Georgia, serif' }}>
+          <h2 className="font-bold" style={{ fontSize: '32px', color: '#2E1065', fontFamily: 'Georgia, serif', textShadow: '0 1px 2px rgba(236,72,153,0.15)' }}>
             Ofertas por fechas especiales
           </h2>
-          <p className="mt-2" style={{ fontSize: '15px', color: '#6B7280' }}>
+          <p className="mt-3" style={{ fontSize: '15px', color: '#6B7280', lineHeight: 1.6 }}>
             Elige un combo armado por nosotros o arma el tuyo. Celebra los momentos que más importan
           </p>
         </div>
+
+        {/* Skeletons mientras cargan combos y productos */}
+        {!loaded && (
+          <div className="space-y-4 mb-10">
+            {[0, 1].map((i) => (
+              <div key={`sk-promo-${i}`} className="overflow-hidden rounded-3xl" style={{ background: '#FFF', border: '1px solid #FBCFE8' }}>
+                <div className="shimmer-bg h-28" />
+                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {[0, 1, 2].map((j) => (
+                    <div key={j} className="overflow-hidden rounded-2xl" style={{ border: '1px solid #FCE7F3' }}>
+                      <div className="shimmer-bg h-48" />
+                      <div className="p-4 space-y-2">
+                        <div className="shimmer-bg h-4 rounded w-2/3" />
+                        <div className="shimmer-bg h-3 rounded w-full" />
+                        <div className="shimmer-bg h-3 rounded w-4/5" />
+                        <div className="shimmer-bg h-9 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Cards de promoción (Día de las Madres, etc.) con combos dentro ── */}
         {comboGroups.map(({ d, target, combos, legacyProducts }) => {
           const fechaStr = target.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
           const totalCombos = combos.length + (legacyProducts.length > 0 ? 1 : 0);
+          const daysLeft = Math.max(0, Math.ceil((target.getTime() - Date.now()) / 86400000));
           return (
-            <article
+            <motion.article
               key={`promo-card-${d.name}-${d.month}-${d.day}`}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
               className="mb-10 overflow-hidden rounded-3xl"
               style={{ background: '#FFF', border: '1px solid #FBCFE8', boxShadow: '0 10px 34px -8px rgba(236,72,153,0.18)' }}
             >
@@ -223,7 +308,6 @@ export function PromotionsSection() {
               >
                 {d.image && (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={d.image} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
                     <div className="absolute inset-0 bg-black/45" aria-hidden />
                   </>
@@ -246,14 +330,37 @@ export function PromotionsSection() {
                       </p>
                     </div>
                   </div>
-                  {combos.length > 0 && (
+                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                    {/* Countdown: urgencia visual */}
                     <span
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold text-white shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(6px)' }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white"
+                      style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)' }}
+                      title={daysLeft <= 1 ? '¡La fecha es hoy o mañana!' : `Faltan ${daysLeft} días para el ${fechaStr}`}
                     >
-                      <Gift className="h-3.5 w-3.5" /> {combos.length} {combos.length === 1 ? 'combo' : 'combos'}
+                      <Timer className="h-3.5 w-3.5" />
+                      {daysLeft <= 0 ? '¡Es hoy!' : daysLeft === 1 ? '¡Mañana!' : `Faltan ${daysLeft} días`}
                     </span>
-                  )}
+                    {combos.length > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold text-white"
+                        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(6px)' }}
+                      >
+                        <Gift className="h-3.5 w-3.5" /> {combos.length} {combos.length === 1 ? 'combo' : 'combos'}
+                      </span>
+                    )}
+                    {/* Compartir la promoción completa */}
+                    {whatsapp && combos.length > 0 && (
+                      <button
+                        onClick={() => sharePromo(d.name, combos, fechaStr)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white transition-all hover:scale-105 active:scale-95"
+                        style={{ background: 'rgba(37,211,102,0.35)', border: '1px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(6px)' }}
+                        aria-label={`Compartir promoción ${d.name} por WhatsApp`}
+                        title="Compartir promoción por WhatsApp"
+                      >
+                        <Share2 className="h-3.5 w-3.5" /> Compartir
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {d.description && (
                   <p className="relative text-sm mt-2 max-w-2xl" style={{ color: 'rgba(255,255,255,0.92)' }}>
@@ -269,30 +376,46 @@ export function PromotionsSection() {
                     <Sparkles className="h-3.5 w-3.5" style={{ color: '#EC4899' }} /> Combos de esta promoción — conformados con varios productos
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {combos.map(({ cfg: c, items }) => {
+                    {combos.map(({ cfg: c, items }, ci) => {
                       const total = items.reduce((n, it) => n + it.price, 0);
                       const pct = Math.min(100, Math.max(0, Number(c.discountPct) || 0));
                       const finalPrice = Math.round(total * (1 - pct / 100));
                       const ahorro = total - finalPrice;
                       return (
-                        <div
+                        <motion.div
                           key={c.id || c.name}
-                          className="group flex flex-col overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1"
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, margin: '-30px' }}
+                          transition={{ duration: 0.35, delay: Math.min(ci * 0.07, 0.28), ease: 'easeOut' }}
+                          className="group flex flex-col overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1.5"
                           style={{ background: '#FFFDFA', border: '1px solid #FBCFE8', boxShadow: '0 6px 20px -6px rgba(236,72,153,0.14)' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 18px 38px -10px rgba(190,24,93,0.32)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 6px 20px -6px rgba(236,72,153,0.14)'; }}
                         >
-                          {/* Zona de imagen: foto del combo o collage de los productos */}
+                          {/* Zona de imagen: foto del combo o collage de los productos (clic → lightbox) */}
                           <div className="relative h-48 sm:h-52 overflow-hidden" style={{ background: 'linear-gradient(135deg, #F3E8FF 0%, #FCE7F3 100%)' }}>
                             {c.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={c.image}
-                                alt={c.name}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                loading="lazy"
-                              />
+                              <button
+                                type="button"
+                                onClick={() => setLightbox({ images: [c.image as string, ...items.map((it) => it.image).filter(Boolean)], idx: 0 })}
+                                className="w-full h-full cursor-zoom-in"
+                                aria-label={`Ampliar foto de ${c.name}`}
+                              >
+                                <img
+                                  src={c.image}
+                                  alt={c.name}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                              </button>
                             ) : items[0]?.image ? (
-                              <>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <button
+                                type="button"
+                                onClick={() => setLightbox({ images: items.map((it) => it.image).filter(Boolean), idx: 0 })}
+                                className="w-full h-full cursor-zoom-in"
+                                aria-label={`Ampliar fotos de los productos de ${c.name}`}
+                              >
                                 <img
                                   src={items[0].image}
                                   alt={items[0].name}
@@ -301,9 +424,8 @@ export function PromotionsSection() {
                                 />
                                 {/* Collage: miniaturas de los demás productos del combo */}
                                 {items.length > 1 && (
-                                  <div className="absolute bottom-2 left-2 flex gap-1.5">
+                                  <span className="absolute bottom-2 left-2 flex gap-1.5">
                                     {items.slice(1, 4).map((it) => (
-                                      // eslint-disable-next-line @next/next/no-img-element
                                       <img
                                         key={it.id}
                                         src={it.image}
@@ -321,17 +443,15 @@ export function PromotionsSection() {
                                         +{items.length - 4}
                                       </span>
                                     )}
-                                  </div>
+                                  </span>
                                 )}
-                              </>
+                              </button>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-5xl">🎁</div>
                             )}
-                            {/* Badge de descuento */}
+                            {/* Cinta de descuento (esquina, estilo promo) */}
                             {pct > 0 && (
-                              <span className="absolute top-3 right-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow-md" style={{ background: '#EC4899' }}>
-                                -{pct}%
-                              </span>
+                              <span className="ribbon-discount">−{pct}%</span>
                             )}
                             {/* Badge de cantidad de productos */}
                             <span
@@ -382,22 +502,36 @@ export function PromotionsSection() {
                                   <span className="text-[11px] font-semibold ml-1" style={{ color: '#9CA3AF' }}>CUP</span>
                                 </p>
                                 {ahorro > 0 && (
-                                  <p className="text-[11px] font-semibold" style={{ color: '#059669' }}>
-                                    Ahorras ₱{ahorro.toLocaleString('es-CU')}
+                                  <p className="text-[11px] font-semibold mt-0.5" style={{ color: '#059669' }}>
+                                    ✓ Ahorras ₱{ahorro.toLocaleString('es-CU')}
                                   </p>
                                 )}
                               </div>
                             </div>
-                            <button
-                              onClick={() => orderCombo(c.name, items)}
-                              className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-                              style={{ background: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)', boxShadow: '0 6px 16px -4px rgba(236,72,153,0.45)' }}
-                            >
-                              <ShoppingBag className="h-4 w-4" /> Pedir combo
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
+                            {/* Acciones: pedir + compartir por WhatsApp */}
+                            <div className="mt-3 flex items-center gap-2">
+                              <button
+                                onClick={() => orderCombo(c.name, items)}
+                                className="card-cta flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                style={{ background: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)', boxShadow: '0 6px 16px -4px rgba(236,72,153,0.45)' }}
+                              >
+                                <ShoppingBag className="h-4 w-4" /> Pedir combo
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                              {whatsapp && (
+                                <button
+                                  onClick={() => shareCombo(c.name, items, finalPrice, pct, d.name)}
+                                  className="inline-flex items-center justify-center w-11 h-11 rounded-full shrink-0 transition-all hover:scale-105 active:scale-95"
+                                  style={{ background: '#FFF', border: '2px solid #25D366', color: '#128C7E' }}
+                                  aria-label={`Compartir ${c.name} por WhatsApp`}
+                                  title="Compartir por WhatsApp"
+                                >
+                                  <MessageCircle className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -421,7 +555,6 @@ export function PromotionsSection() {
                       >
                         <div className="h-36 overflow-hidden bg-gray-100">
                           {pr.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={pr.image}
                               alt={pr.name}
@@ -443,7 +576,7 @@ export function PromotionsSection() {
                   </div>
                 </div>
               )}
-            </article>
+            </motion.article>
           );
         })}
 
@@ -505,6 +638,97 @@ export function PromotionsSection() {
           </p>
         </div>
       </div>
+
+      {/* ═══ LIGHTBOX: fotos del combo a pantalla completa (teclado ←/→/Esc) ═══ */}
+      <AnimatePresence>
+        {lightbox && lightbox.images.length > 0 && (
+          <motion.div
+            key="combo-lightbox"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center"
+            style={{ background: 'rgba(10, 5, 16, 0.97)' }}
+            onClick={() => setLightbox(null)}
+            role="dialog"
+            aria-label="Fotos del combo ampliadas"
+          >
+            {/* Cerrar */}
+            <button
+              className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full flex items-center justify-center text-white hover:bg-white/15 transition-colors"
+              onClick={() => setLightbox(null)}
+              aria-label="Cerrar vista ampliada"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Flechas (si hay varias fotos) */}
+            {lightbox.images.length > 1 && (
+              <>
+                <button
+                  className="absolute left-3 sm:left-6 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all hover:scale-110"
+                  style={{ background: 'rgba(236,72,153,0.3)', backdropFilter: 'blur(6px)' }}
+                  onClick={(e) => { e.stopPropagation(); lightboxPrev(); }}
+                  aria-label="Foto anterior"
+                >
+                  <ChevronLeft className="h-7 w-7" />
+                </button>
+                <button
+                  className="absolute right-3 sm:right-6 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white transition-all hover:scale-110"
+                  style={{ background: 'rgba(236,72,153,0.3)', backdropFilter: 'blur(6px)' }}
+                  onClick={(e) => { e.stopPropagation(); lightboxNext(); }}
+                  aria-label="Foto siguiente"
+                >
+                  <ChevronRight className="h-7 w-7" />
+                </button>
+              </>
+            )}
+
+            {/* Imagen gigante */}
+            <motion.img
+              key={lightbox.idx}
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              src={lightbox.images[lightbox.idx]}
+              alt={`Foto ${lightbox.idx + 1} del combo`}
+              className="max-w-[94vw] max-h-[88vh] object-contain rounded-2xl"
+              style={{ boxShadow: '0 20px 80px rgba(0,0,0,0.6)' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Contador + miniaturas */}
+            <div
+              className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-xs font-bold text-white/80 tabular-nums">
+                {lightbox.idx + 1} / {lightbox.images.length}
+              </span>
+              {lightbox.images.length > 1 && (
+                <div className="flex gap-2 justify-center flex-wrap px-4">
+                  {lightbox.images.map((src, i) => (
+                    <button
+                      key={`${src}-${i}`}
+                      onClick={() => setLightbox((lb) => (lb ? { ...lb, idx: i } : lb))}
+                      className="h-14 w-14 rounded-xl overflow-hidden transition-all"
+                      style={{
+                        outline: i === lightbox.idx ? '3px solid #EC4899' : '2px solid rgba(255,255,255,0.15)',
+                        outlineOffset: '2px',
+                        opacity: i === lightbox.idx ? 1 : 0.55,
+                      }}
+                      aria-label={`Ir a foto ${i + 1}`}
+                    >
+                      <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

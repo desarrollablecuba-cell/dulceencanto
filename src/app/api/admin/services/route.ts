@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { requireAdmin, unauthorized } from '@/lib/auth';
+import { parseServiceVariants, serializeServiceVariants, SERVICE_USD_RATE } from '@/lib/service-variants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,9 +11,14 @@ export const dynamic = 'force-dynamic';
  *
  *  GET    → todos los servicios (incluye inactivos), ordenados.
  *  POST   → crea un servicio { name, description, icon, image, price,
- *            priceUsd, category, active, order }.
+ *            priceUsd, category, active, order, variants }.
  *  PUT    → actualiza un servicio { id, ...campos }.
  *  DELETE → elimina un servicio ?id=...
+ *
+ * V52.5:
+ *  · El admin edita el precio SOLO EN USD — el precio CUP se deriva
+ *    automáticamente (price = priceUsd × 700, tasa de referencia).
+ *  · `variants` llega como array (o JSON string) y se guarda serializado.
  *
  * Las cards públicas (/api/services) solo devuelven los activos; aquí el
  * admin ve y gestiona TODOS (incluidos los ocultos).
@@ -29,6 +35,7 @@ interface ServiceBody {
   category?: string;
   active?: boolean;
   order?: number;
+  variants?: unknown;
 }
 
 export async function GET(request: Request) {
@@ -52,17 +59,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El nombre del servicio es obligatorio' }, { status: 400 });
     }
     const now = new Date().toISOString();
+    const priceUsd = Number(body.priceUsd) || 0;
     const service = await db.service.create({
       data: {
         name: body.name.trim(),
         description: body.description || '',
         icon: body.icon || '✨',
         image: body.image || '',
-        price: Number(body.price) || 0,
-        priceUsd: Number(body.priceUsd) || 0,
+        price: body.price !== undefined ? Number(body.price) || 0 : Math.round(priceUsd * SERVICE_USD_RATE),
+        priceUsd,
         category: body.category || 'decoracion',
         active: body.active !== false,
         order: Number.isFinite(Number(body.order)) ? Number(body.order) : 100,
+        variants: serializeServiceVariants(parseServiceVariants(body.variants)),
         createdAt: now,
         updatedAt: now,
       },
@@ -85,11 +94,18 @@ export async function PUT(request: Request) {
     if (body.description !== undefined) data.description = String(body.description);
     if (body.icon !== undefined) data.icon = String(body.icon);
     if (body.image !== undefined) data.image = String(body.image);
+    if (body.priceUsd !== undefined) {
+      const usd = Number(body.priceUsd) || 0;
+      data.priceUsd = usd;
+      // V52.5 — el CUP se deriva del USD salvo que el llamador lo fije
+      // explícitamente (compatibilidad con clientes antiguos).
+      if (body.price === undefined) data.price = Math.round(usd * SERVICE_USD_RATE);
+    }
     if (body.price !== undefined) data.price = Number(body.price) || 0;
-    if (body.priceUsd !== undefined) data.priceUsd = Number(body.priceUsd) || 0;
     if (body.category !== undefined) data.category = String(body.category);
     if (body.active !== undefined) data.active = Boolean(body.active);
     if (body.order !== undefined) data.order = Number(body.order) || 0;
+    if (body.variants !== undefined) data.variants = serializeServiceVariants(parseServiceVariants(body.variants));
 
     const service = await db.service.update({ where: { id: body.id }, data });
     return NextResponse.json(service);

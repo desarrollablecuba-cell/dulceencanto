@@ -46,7 +46,7 @@ const reservationCategories = [
 
 // ─── CATEGORÍAS — Venta Directa (dulces finos + buffet) ────────────────────
 const immediateCategories = [
-  { id: 'cat-dulces-finos', name: 'Dulces Finos y Buffet', slug: 'dulces-finos-buffet', icon: '🧁', order: 5 },
+  { id: 'cat-dulces-finos', name: 'Buffet para Repartir', slug: 'dulces-finos-buffet', icon: '🧁', order: 5 },
 ];
 
 const allCategories = [...reservationCategories, ...immediateCategories];

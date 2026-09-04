@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 
+/**
+ * V52.7 — Modo de venta de un item del carrito.
+ *  - 'direct'     → Venta Directa: se paga en CUP (efectivo local) y descuenta stock.
+ *  - 'reservation' → Reservable: se encarga con antelación y se paga en USD.
+ *
+ * REGLA DE NEGOCIO: un pedido NO puede mezclar ambos modos. El carrito
+ * bloquea la mezcla en addItem() con un mensaje claro para el cliente.
+ */
+export type SaleMode = 'direct' | 'reservation';
+
 export interface CartItem {
   productId: string;
   name: string;
@@ -8,6 +18,8 @@ export interface CartItem {
   image: string;
   quantity: number;
   stock?: number; // stock disponible del producto (para validar al agregar)
+  /** V52.7 — canal de venta del item ('direct' | 'reservation'). */
+  saleMode?: SaleMode;
   /**
    * JSON string con las opciones de variantes seleccionadas.
    * Formato: [{ groupName: string, optionName: string, optionId?: string }]
@@ -38,7 +50,6 @@ export interface CartItem {
   // Días de antelación requeridos para la reserva (del producto).
   reservationDays?: number;
 }
-
 interface CartState {
   items: CartItem[];
   _hydrated: boolean;
@@ -107,6 +118,39 @@ export function getCartKey(item: { productId: string; variantInfo?: string; extr
   return `${item.productId}__v=${item.variantInfo || '[]'}__e=${item.extrasInfo || '[]'}`;
 }
 
+/**
+ * V52.7 — Modo de venta efectivo de un item del carrito.
+ * Los items viejos (persistidos antes de V52.7) sin saleMode se deducen
+ * de isReservation (true → reservation, false/undefined → direct).
+ */
+export function itemSaleMode(item: { saleMode?: SaleMode; isReservation?: boolean }): SaleMode {
+  if (item.saleMode === 'reservation' || item.saleMode === 'direct') return item.saleMode;
+  return item.isReservation ? 'reservation' : 'direct';
+}
+
+/**
+ * V52.7 — Modo del carrito completo:
+ *  - 'reservation' → todos los items son reservables → precios en USD.
+ *  - 'direct'      → todos los items son de Venta Directa → precios en CUP.
+ *  - 'mixed'       → mezcla (solo posible en carritos viejos persistidos).
+ *  - null          → carrito vacío.
+ */
+export function cartSaleMode(items: { saleMode?: SaleMode; isReservation?: boolean }[]): SaleMode | 'mixed' | null {
+  if (items.length === 0) return null;
+  const hasReservation = items.some((i) => itemSaleMode(i) === 'reservation');
+  const hasDirect = items.some((i) => itemSaleMode(i) === 'direct');
+  if (hasReservation && hasDirect) return 'mixed';
+  return hasReservation ? 'reservation' : 'direct';
+}
+
+/**
+ * V52.7 — Moneda en la que se MUESTRA el carrito:
+ * reservables → USD · venta directa → CUP. (Regla del negocio.)
+ */
+export function cartCurrency(items: { saleMode?: SaleMode; isReservation?: boolean }[]): 'CUP' | 'USD' {
+  return cartSaleMode(items) === 'reservation' ? 'USD' : 'CUP';
+}
+
 export const useCartStore = create<CartState>()((set, get) => ({
   items: [],
   _hydrated: false,
@@ -117,6 +161,27 @@ export const useCartStore = create<CartState>()((set, get) => ({
     const existing = items.find((i) => getCartKey(i) === key);
     const currentQty = existing?.quantity || 0;
     const stock = typeof item.stock === 'number' ? item.stock : Infinity;
+
+    // ── V52.7 — REGLA: no mezclar Venta Directa (₡CUP) con Reservables ($USD) ──
+    const incomingMode = itemSaleMode(item);
+    if (items.length > 0) {
+      const cartMode = cartSaleMode(items);
+      const conflicting = cartMode === 'mixed' || (cartMode !== null && cartMode !== incomingMode);
+      if (conflicting) {
+        const incomingLabel = incomingMode === 'reservation'
+          ? 'un producto RESERVABLE (se paga en $ USD)'
+          : 'un producto de VENTA DIRECTA (se paga en ₡CUP)';
+        const cartLabel = cartMode === 'reservation'
+          ? 'Tu carrito tiene productos RESERVABLES ($ USD)'
+          : cartMode === 'direct'
+            ? 'Tu carrito tiene productos de VENTA DIRECTA (₡CUP)'
+            : 'Tu carrito mezcla venta directa y reservables';
+        return {
+          ok: false,
+          reason: `${cartLabel}. No puedes agregar ${incomingLabel} en el mismo pedido. Completa o vacía el carrito primero.`,
+        };
+      }
+    }
 
     // Validar stock: no permitir agregar más de lo disponible
     if (currentQty + 1 > stock) {

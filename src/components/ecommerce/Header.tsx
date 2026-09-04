@@ -3,7 +3,7 @@
 import { ShoppingCart, Search, History, Menu, X, User, Sparkles, Phone, Clock, CalendarHeart, Home, ChevronRight, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCartStore } from '@/store/cart-store';
+import { useCartStore, cartCurrency } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
 import { useCustomerStore } from '@/store/customer-store';
 import { useCurrencyStore } from '@/store/currency-store';
@@ -28,7 +28,7 @@ export function Header() {
   const hydrated = useCartStore((s) => s._hydrated);
   const getTotal = useCartStore((s) => s.getTotal);
   const getItemCount = useCartStore((s) => s.getItemCount);
-  const { setSearchQuery, setView } = useAppStore();
+  const { setSearchQuery, setView, currentView } = useAppStore();
   const customer = useCustomerStore((s) => s.customer);
   const customerHydrated = useCustomerStore((s) => s.hydrated);
   const hydrateCustomer = useCustomerStore((s) => s.hydrate);
@@ -102,6 +102,11 @@ export function Header() {
 
   const itemCount = hydrated ? getItemCount() : 0;
   const cartTotal = hydrated ? getTotal() : 0;
+  // V52.7 — moneda del carrito: reservables → $ USD · venta directa → ₡ CUP
+  const cartCur = cartCurrency(cartItems);
+  const cartTotalLabel = cartCur === 'USD'
+    ? `$${(cartTotal / 700).toFixed(2)}`
+    : `₡${cartTotal.toLocaleString('es-CU')}`;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,10 +286,10 @@ export function Header() {
                 onClick={() => window.dispatchEvent(new CustomEvent('toggleCart'))}
                 className={`relative bg-brand hover:bg-brand-dark text-white h-11 px-4 rounded-full shadow-lg animate-pulse-slow shrink-0 transition-transform ${cartBump ? 'scale-110' : 'scale-100'}`}
                 style={{ transition: 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-                aria-label={`Abrir carrito con ${itemCount} producto(s), total $${cartTotal.toFixed(2)}`}
+                aria-label={`Abrir carrito con ${itemCount} producto(s), total ${cartTotalLabel}`}
               >
                 <ShoppingCart className="h-5 w-5 fill-white" />
-                <span className="ml-1.5 font-bold text-base hidden sm:inline">${cartTotal.toFixed(2)}</span>
+                <span className="ml-1.5 font-bold text-base hidden sm:inline">{cartTotalLabel}</span>
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center ring-2 ring-white">{itemCount}</span>
               </Button>
             ) : (
@@ -355,8 +360,13 @@ export function Header() {
                   </button>
                 </div>
 
-                {/* Navigation — configurable items (hamburgerItems) */}
+                {/* V52.6 — Secciones de la tienda (mismas que la barra
+                    flotante móvil / menú de escritorio): siempre visibles
+                    arriba del drawer para navegar de inmediato. */}
                 <div className="px-4 py-4 space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest px-1 pb-1" style={{ color: '#E9D5FF' }}>
+                    Secciones de la tienda
+                  </p>
                   {/* Inicio siempre presente */}
                   <motion.button
                     initial={{ opacity: 0, x: -20 }}
@@ -364,12 +374,45 @@ export function Header() {
                     transition={{ delay: 0.05 }}
                     onClick={() => { setView('home'); setMobileMenuOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-white text-sm font-medium transition-all hover:bg-white/10"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(236,72,153,0.15)' }}
+                    style={currentView === 'home' || currentView === 'catalog' ? { background: 'linear-gradient(135deg, rgba(236,72,153,0.45) 0%, rgba(168,85,247,0.45) 100%)', border: '1px solid rgba(236,72,153,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(236,72,153,0.15)' }}
                   >
                     <Home className="h-4 w-4" style={{ color: '#F9A8D4' }} />
                     <span className="flex-1 text-left">Inicio</span>
-                    <ChevronRight className="h-4 w-4 opacity-50" />
+                    {(currentView === 'home' || currentView === 'catalog') && (
+                      <span className="w-2 h-2 rounded-full" style={{ background: '#EC4899', boxShadow: '0 0 8px rgba(236,72,153,0.8)' }} aria-label="Sección actual" />
+                    )}
                   </motion.button>
+                  {navSections.filter((sec) => sec.visible).map((sec, i) => {
+                    const active = currentView === sec.id;
+                    return (
+                      <motion.button
+                        key={sec.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.08 + i * 0.05 }}
+                        onClick={() => { setView(sec.id as any); setMobileMenuOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-white text-sm font-medium transition-all hover:bg-white/10"
+                        style={active ? { background: 'linear-gradient(135deg, rgba(236,72,153,0.45) 0%, rgba(168,85,247,0.45) 100%)', border: '1px solid rgba(236,72,153,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(236,72,153,0.15)' }}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <span style={{ fontSize: '18px' }}>{sec.icon}</span>
+                        <span className="flex-1 text-left">{sec.label}</span>
+                        {active && (
+                          <span className="w-2 h-2 rounded-full" style={{ background: '#EC4899', boxShadow: '0 0 8px rgba(236,72,153,0.8)' }} aria-label="Sección actual" />
+                        )}
+                        {!active && <ChevronRight className="h-4 w-4 opacity-50" />}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                {/* Utilities — configurable items (hamburgerItems) */}
+                <div className="px-4 pb-4 space-y-1.5">
+                  {hamburgerItems.filter((it) => it.visible).length > 0 && (
+                    <p className="text-[10px] font-bold uppercase tracking-widest px-1 pb-1" style={{ color: '#E9D5FF' }}>
+                      Más opciones
+                    </p>
+                  )}
                   {hamburgerItems.filter((it) => it.visible).map((item, i) => (
                     <motion.button
                       key={item.id}

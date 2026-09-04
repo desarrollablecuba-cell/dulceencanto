@@ -144,8 +144,32 @@ function LoginForm({ onLogin }: { onLogin: (token: string) => void }) {
   );
 }
 
+/**
+ * Detecta si el dispositivo actual es móvil (teléfono/tablet).
+ * En PC/portátil el botón “Instalar App” del header NO se muestra: la app
+ * se instala como acceso directo móvil y en escritorio solo confunde
+ * (fix V52.5 — el negocio lo reportó viéndolo en la vista PC).
+ */
+function useIsMobileDevice(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+      const narrowViewport = window.innerWidth <= 900;
+      const uaMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+      setMobile((coarsePointer && (narrowViewport || uaMobile)) || uaMobile);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return mobile;
+}
+
 function AdminLayout({ onLogout }: { onLogout: () => void }) {
   const [showInstall, setShowInstall] = useState(false);
+  // ⭐ V52.5 — el acceso “Instalar App” solo tiene sentido en móvil
+  const isMobile = useIsMobileDevice();
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
@@ -163,15 +187,18 @@ function AdminLayout({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setShowInstall(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-white transition-colors hover:bg-white/10"
-              style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}
-              title="Instalar como aplicación"
-            >
-              <Smartphone className="h-4 w-4" />
-              <span className="hidden sm:inline">Instalar App</span>
-            </button>
+            {/* ⭐ V52.5 — solo visible en móvil (en PC no aplica instalar app) */}
+            {isMobile && (
+              <button
+                onClick={() => setShowInstall(true)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-white transition-colors hover:bg-white/10"
+                style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}
+                title="Instalar como aplicación"
+              >
+                <Smartphone className="h-4 w-4" />
+                <span className="hidden sm:inline">Instalar App</span>
+              </button>
+            )}
             <a
               href="/"
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-100 hover:text-white hover:bg-gray-800 transition-colors"

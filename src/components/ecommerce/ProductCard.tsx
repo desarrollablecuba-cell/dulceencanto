@@ -3,7 +3,7 @@
 import { ShoppingCart, Star, Eye, Heart } from 'lucide-react';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
+import { useCurrencyStore, formatPrice, currencyForProduct, isDirectSaleProduct } from '@/store/currency-store';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductTag {
@@ -20,6 +20,8 @@ interface Product {
   price: number;
   image: string;
   tags?: string;
+  /** V52.6 — unidad de venta ('docena' → etiqueta "Por Docena" en la card). */
+  saleUnit?: string;
   offerEnabled?: boolean;
   offerPrice?: number;
   offerType?: string;
@@ -168,12 +170,17 @@ export function ProductCard({ product }: ProductCardProps) {
       selectProduct(product.id);
       return;
     }
+    // V52.7 — canal de venta: venta directa (₡CUP) o reservable ($USD).
+    const mode: 'direct' | 'reservation' = isDirectSaleProduct(product) ? 'direct' : 'reservation';
     const result = addItem({
       productId: product.id,
       name: product.name,
       price: effectivePrice,
       image: product.image,
-      stock: product.stock,
+      stock: mode === 'reservation' ? undefined : product.stock,
+      saleMode: mode,
+      isReservation: mode === 'reservation',
+      reservationDays: mode === 'reservation' ? Number((product as any).reservationDays || 0) : 0,
     });
     if (!result.ok) {
       toast({
@@ -198,6 +205,9 @@ export function ProductCard({ product }: ProductCardProps) {
   // El precio destacado es el mismo precio del producto, sin tachado ni cálculo.
   // Si se quiere un precio rebajado, se configura como Oferta (offerEnabled).
   const title = product.shortName?.trim() || product.name;
+
+  // V52.6 — dulces finos por docena: etiqueta bien visible en la card
+  const isDozen = product.saleUnit === 'docena';
 
   // Determinar qué badge mostrar arriba a la derecha (prioridad: oferta > mayor > destacado).
   // Solo uno a la vez para no saturar la esquina.
@@ -269,6 +279,26 @@ export function ProductCard({ product }: ProductCardProps) {
           }}
         >
           -{Math.round((1 - (product.offerPrice as number) / product.price) * 100)}%
+        </span>
+      )}
+
+      {/* V52.6 — Etiqueta "Por Docena": deja claro desde fuera que se
+          vende la docena (dulces finos). Se ubica bajo el badge de oferta. */}
+      {isDozen && (
+        <span
+          className="absolute left-0 right-0 flex justify-center"
+          style={{ top: offerActive ? '48px' : '12px', zIndex: 2, pointerEvents: 'none' }}
+        >
+          <span
+            className="inline-flex items-center gap-1 text-white font-bold whitespace-nowrap"
+            style={{
+              padding: '4px 12px', borderRadius: '999px', fontSize: '11px',
+              background: 'linear-gradient(135deg, #EC4899 0%, #F59E0B 100%)',
+              boxShadow: '0 3px 10px rgba(236,72,153,0.4)',
+            }}
+          >
+            🍬 Por Docena
+          </span>
         </span>
       )}
 
@@ -360,10 +390,12 @@ export function ProductCard({ product }: ProductCardProps) {
               <span className="text-xs line-through" style={{ color: '#9CA3AF' }}>
                 {formatPrice(product.price, displayCurrency)}
               </span>
+              {isDozen && <span className="text-[11px] font-semibold" style={{ color: '#9CA3AF' }}>por docena</span>}
             </div>
           ) : (
-            <p className="font-bold" style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
+            <p className="font-bold flex items-baseline justify-center gap-1" style={{ fontSize: '20px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
               {formatPrice(product.price, displayCurrency)}
+              {isDozen && <span className="text-[11px] font-semibold" style={{ color: '#9CA3AF' }}>por docena</span>}
             </p>
           )}
         </div>

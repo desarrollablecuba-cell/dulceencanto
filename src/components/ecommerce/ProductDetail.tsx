@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useCartStore } from '@/store/cart-store';
-import { useCurrencyStore, formatPrice, currencyForProduct } from '@/store/currency-store';
+import { formatPrice } from '@/store/currency-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -96,6 +96,12 @@ interface Product {
   image: string;
   images?: string;
   tags?: string;
+  /** V52.6 — unidad de venta ('docena' → el precio se muestra "por docena"). */
+  saleUnit?: string;
+  /** V52.6 — disponible en el grupo "Buffet para Repartir" de Reservas. */
+  buffetEnabled?: boolean;
+  /** V52.8 — precio de la docena del buffet (USD). */
+  buffetPriceUsd?: number;
   offerEnabled?: boolean;
   offerPrice?: number;
   offerType?: string;
@@ -310,6 +316,7 @@ function ImageZoom({ src, alt }: { src: string; alt: string }) {
 
 export function ProductDetail() {
   const { selectedProductId, setView, selectCategory, goBack } = useAppStore();
+  const viewHistory = useAppStore((s) => s.viewHistory);
   const addItem = useCartStore((s) => s.addItem);
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
@@ -394,12 +401,37 @@ export function ProductDetail() {
   const currentImage = selectedImage || product?.image || '';
 
   const offerActive = product ? isOfferActive(product) : false;
-  const basePrice = product ? (offerActive ? (product.offerPrice as number) : product.price) : 0;
-  // REGLA DE MONEDA: todos los precios por defecto en USD, PERO los productos
-  // de venta directa (buffet, dulces sueltos) se muestran siempre en CUP.
-  const globalCurrency = useCurrencyStore((st) => st.currency);
-  const displayCurrency = product ? currencyForProduct(product, globalCurrency) : globalCurrency;
+  const basePriceRaw = product ? (offerActive ? (product.offerPrice as number) : product.price) : 0;
+  // REGLA DE MONEDA (V52.7): los productos RESERVABLES se muestran y venden
+  // en USD ($, Zelle); los de VENTA DIRECTA siempre en CUP (₡, efectivo).
+  // El modo se deduce de la vista de origen (Reservas / Venta Directa) y,
+  // si no procede de ninguna, de las banderas del producto.
+  const sourceView = viewHistory.length > 0 ? viewHistory[viewHistory.length - 1] : null;
+  const productSaleMode: 'direct' | 'reservation' = useMemo(() => {
+    if (sourceView === 'reservations') return 'reservation';
+    if (sourceView === 'immediate') return 'direct';
+    if (!product) return 'direct';
+    if (product.reservationEnabled === true) return 'reservation';
+    if (product.category?.section === 'reservation') return 'reservation';
+    // V52.8 — un producto del buffet (visto sin historial) también es reserva
+    if (product.buffetEnabled === true && (product as any).category?.section !== 'reservation') return 'reservation';
+    return 'direct';
+  }, [sourceView, product]);
+  const displayCurrency: 'CUP' | 'USD' = productSaleMode === 'reservation' ? 'USD' : 'CUP';
   const fmt = (cup: number) => formatPrice(cup, displayCurrency);
+
+  // V52.8 — MODO BUFFET: producto de Venta Directa visto desde RESERVAS
+  // (grupo "Buffet para Repartir"). Se vende POR DOCENA en USD (buffetPriceUsd,
+  // 30 por defecto), igual que los dulces finos — NO usa su precio unitario CUP.
+  const isBuffetMode = !!(
+    product &&
+    productSaleMode === 'reservation' &&
+    product.buffetEnabled === true &&
+    product.category?.section !== 'reservation' &&
+    (product.reservationEnabled ?? false) === false
+  );
+  const buffetPriceCup = Math.round((Number((product as any)?.buffetPriceUsd) || 30) * 700);
+  const basePrice = isBuffetMode ? buffetPriceCup : basePriceRaw;
 
   // Suma de priceMods de opciones seleccionadas
   const optionsPriceMod = useMemo(() => {
@@ -547,20 +579,21 @@ export function ProductDetail() {
   const handleAddToCart = (forceReservation?: boolean) => {
     if (!product) return;
 
-    // ── Validar compatibilidad de reservables en el carrito ──
-    // Si el carrito ya tiene items reservables (isReservation=true) y el cliente
-    // intenta agregar un item normal (forceReservation=false), o viceversa,
-    // no permitirlo porque generaría un pedido con dos fechas de entrega.
-    // Las mercancías SÍ pueden mezclarse con reservables.
-    const willBeReservation = forceReservation ?? isReservable;
+    // ── V52.7 — Validar compatibilidad de canales en el carrito ──
+    // No se pueden mezclar productos de Venta Directa (₡CUP) con productos
+    // Reservables ($USD) en un mismo pedido. El cart-store también valida,
+    // pero aquí anticipamos el aviso con un mensaje amigable.
+    const willBeReservation = forceReservation ?? productSaleMode === 'reservation';
     const existingItems = useCartStore.getState().items;
-    const hasReservationsInCart = existingItems.some((i) => i.isReservation);
-    const hasNormalInCart = existingItems.some((i) => !i.isReservation);
+    const hasReservationsInCart = existingItems.some((i) => i.saleMode === 'reservation' || i.isReservation);
+    const hasNormalInCart = existingItems.some(
+      (i) => (i.saleMode ?? (i.isReservation ? 'reservation' : 'direct')) === 'direct'
+    );
 
     if (willBeReservation && hasNormalInCart) {
       toast({
-        title: '⚠️ No puedes mezclar reservas con entregas normales',
-        description: 'Tu carrito tiene productos para entrega hoy/mañana. Vacía el carrito para agregar reservas.',
+        title: '⚠️ No puedes mezclar venta directa con reservables',
+        description: 'Tu carrito tiene productos de Venta Directa (₡CUP). Vacíalo o completa ese pedido para agregar reservas ($USD).',
         variant: 'destructive',
         duration: 8000,
       });
@@ -568,8 +601,8 @@ export function ProductDetail() {
     }
     if (!willBeReservation && hasReservationsInCart) {
       toast({
-        title: '⚠️ No puedes mezclar entregas normales con reservas',
-        description: 'Tu carrito tiene reservas con fecha futura. Vacía el carrito para agregar productos normales.',
+        title: '⚠️ No puedes mezclar reservables con venta directa',
+        description: 'Tu carrito tiene productos reservables ($USD). Vacíalo o completa ese pedido para agregar productos de Venta Directa (₡CUP).',
         variant: 'destructive',
         duration: 8000,
       });
@@ -616,7 +649,9 @@ export function ProductDetail() {
     // Validar stock total antes de agregar (excepto si es reservable)
     // Si el producto es reservable (reservationEnabled && stock=0), se permite
     // agregar al carrito sin validación de stock.
-    if (!isReservable) {
+    // V52.8 — el modo buffet (docena por USD) tampoco limita por stock:
+    // se elabora bajo pedido igual que el resto de reservas.
+    if (!isReservable && !isBuffetMode) {
       // Usar el existingInCart ya calculado (reactivo a cartItems)
       if (existingInCart + quantity > effectiveStock) {
         toast({
@@ -660,17 +695,17 @@ export function ProductDetail() {
     for (let i = 0; i < quantity; i++) {
       addItem({
         productId: product.id,
-        name: product.name,
+        // V52.8 — en modo buffet el ítem es UNA DOCENA a buffetPriceUsd USD
+        name: isBuffetMode ? `${product.name} — Docena` : product.name,
         price: effectivePrice,
-        basePrice: product.price,
+        basePrice: isBuffetMode ? buffetPriceCup : product.price,
         image: currentImage || product.image,
         variantInfo: variantInfoStr,
         extrasInfo: extrasInfoStr,
-        // Si es reservable, no pasar stock para que el cart-store no bloquee
-        // Si forceReservation viene del botón "Reservar" (producto con stock>0),
-        // el item se marca como reserva. Si viene del botón "Agregar al Carrito",
-        // NO es reserva (se descontará stock si no hay otros reservables).
-        stock: (forceReservation ?? isReservable) ? undefined : effectiveStock,
+        // V52.7 — modo de venta del item: reservable ($USD, sin límite de
+        // stock) o venta directa (₡CUP, descuenta stock disponible).
+        saleMode: willBeReservation ? 'reservation' : 'direct',
+        stock: willBeReservation ? undefined : effectiveStock,
         wholesaleEnabled: !!product.wholesaleEnabled,
         wholesalePrice: product.wholesalePrice ? Number(product.wholesalePrice) : 0,
         wholesaleMinQty: product.wholesaleMinQty ? Number(product.wholesaleMinQty) : 0,
@@ -678,14 +713,14 @@ export function ProductDetail() {
         optionsPriceMod,
         extrasPriceMod,
         // Reserva: si el item es reservable, guardar flag y días de antelación
-        isReservation: forceReservation ?? isReservable,
-        reservationDays: (forceReservation ?? isReservable) ? Number(product.reservationDays || 0) : 0,
+        isReservation: willBeReservation,
+        reservationDays: willBeReservation ? Number(product.reservationDays || 0) : 0,
       });
     }
     setAdded(true);
     toast({
-      title: 'Agregado al carrito',
-      description: `${quantity}x ${product.name} se agregó a tu carrito.`,
+      title: willBeReservation ? '✓ Reserva agregada al carrito' : 'Agregado al carrito',
+      description: `${quantity}x ${product.name} — ${formatPrice(effectivePrice * quantity, willBeReservation ? 'USD' : 'CUP')}`,
     });
     setTimeout(() => setAdded(false), 2000);
   };
@@ -925,9 +960,9 @@ export function ProductDetail() {
             )}
           </div>
 
-          {/* Price */}
+          {/* Price — V52.8: en modo buffet se muestra el precio de la DOCENA */}
           <div className="flex items-end gap-3 flex-wrap">
-            {offerActive ? (
+            {offerActive && !isBuffetMode ? (
               <>
                 <span className="text-3xl font-bold text-brand-dark">{fmt(product.offerPrice as number)}</span>
                 <span className="text-lg text-gray-400 line-through">{fmt(product.price)}</span>
@@ -937,8 +972,17 @@ export function ProductDetail() {
               </>
             ) : (
               <>
-                <span className="text-3xl font-bold text-gray-900">{fmt(product.price)}</span>
+                <span className="text-3xl font-bold text-gray-900">{fmt(basePrice)}</span>
               </>
+            )}
+            {/* V52.6 — dulces finos / V52.8 — buffet: el precio es por docena */}
+            {(product.saleUnit === 'docena' || isBuffetMode) && (
+              <Badge
+                className="text-xs font-bold border-0"
+                style={{ background: 'linear-gradient(135deg, #EC4899 0%, #F59E0B 100%)', color: '#FFF' }}
+              >
+                🍬 {isBuffetMode ? 'Buffet: precio por docena (12 u)' : 'Precio por docena (12 unidades)'}
+              </Badge>
             )}
           </div>
 
@@ -1190,9 +1234,11 @@ export function ProductDetail() {
               )}
             </div>
           )}
-          {isReservable && (
+          {(isReservable || productSaleMode === 'reservation') && (
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700">Cantidad a reservar:</span>
+              <span className="text-sm font-medium text-gray-700">
+                {isBuffetMode ? 'Docenas a reservar:' : 'Cantidad a reservar:'}
+              </span>
               <div className="flex items-center border rounded-lg overflow-hidden">
                 <Button
                   variant="ghost"
@@ -1213,66 +1259,52 @@ export function ProductDetail() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {isBuffetMode && (
+                <span className="text-xs text-amber-700 font-semibold">
+                  = {quantity * 12} unidades
+                </span>
+              )}
             </div>
           )}
 
-          {/* Add to cart / Reservar */}
-          {/* Caso 1: Producto reservable con stock=0 → solo botón Reservar */}
-          {/* Caso 2: Producto reservable con stock>0 → dos botones: Reservar + Agregar */}
-          {/* Caso 3: Producto normal → solo botón Agregar al Carrito */}
-          {product.reservationEnabled && effectiveStock > 0 && !isReservable ? (
-            // Caso 2: dos botones
-            <div className="space-y-2">
-              <Button
-                size="lg"
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg h-12 text-base shadow-amber/25"
-                onClick={() => handleAddToCart(true)}
-              >
-                {added ? (
-                  <>
-                    <Check className="mr-2 h-5 w-5" />
-                    Reserva Agregada
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="mr-2 h-5 w-5" />
-                    Reservar — {fmt(effectivePrice * quantity)}
-                  </>
-                )}
-              </Button>
-              <Button
-                size="lg"
-                className="w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white shadow-lg h-12 text-base shadow-brand/25"
-                disabled={availableStock === 0}
-                onClick={() => handleAddToCart(false)}
-              >
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Agregar al Carrito — {fmt(effectivePrice * quantity)}
-              </Button>
-            </div>
-          ) : (
-            // Caso 1 y 3: un solo botón
+          {/* Add to cart / Reservar — V52.7: botón único según el canal.
+              Reservable ($USD) → "Reservar" · Venta Directa (₡CUP) → "Agregar". */}
+          {productSaleMode === 'reservation' ? (
             <Button
               size="lg"
-              className={`w-full text-white shadow-lg h-12 text-base ${
-                isReservable
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber/25'
-                  : 'bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark shadow-brand/25'
-              }`}
-              disabled={availableStock === 0 && !isReservable}
-              onClick={() => handleAddToCart(isReservable)}
+              className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg h-12 text-base shadow-purple/25"
+              onClick={() => handleAddToCart()}
             >
               {added ? (
                 <>
                   <Check className="mr-2 h-5 w-5" />
-                  {isReservable ? 'Reserva Agregada' : 'Agregado al Carrito'}
+                  Reserva Agregada
                 </>
               ) : (
                 <>
                   <ShoppingCart className="mr-2 h-5 w-5" />
-                  {isReservable
-                    ? `Reservar — ${fmt(effectivePrice * quantity)}`
-                    : `Agregar al Carrito — ${fmt(effectivePrice * quantity)}`}
+                  Reservar — {fmt(effectivePrice * quantity)} USD
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              className="w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand-dark text-white shadow-lg h-12 text-base shadow-brand/25"
+              disabled={availableStock === 0 && !isReservable}
+              onClick={() => handleAddToCart()}
+            >
+              {added ? (
+                <>
+                  <Check className="mr-2 h-5 w-5" />
+                  Agregado al Carrito
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="mr-2 h-5 w-5" />
+                  {availableStock === 0 && !isReservable
+                    ? 'Sin stock disponible'
+                    : `Agregar al Carrito — ${fmt(effectivePrice * quantity)} CUP`}
                 </>
               )}
             </Button>

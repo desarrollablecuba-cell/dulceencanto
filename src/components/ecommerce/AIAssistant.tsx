@@ -34,9 +34,10 @@ export function AIAssistant() {
 
   return (
     <>
-      {/* Tooltip */}
+      {/* Tooltip — apilado SOBRE el botón de WhatsApp y la flecha "volver
+          arriba" (fix V52.8: antes coincidía con la flecha en móvil) */}
       {showTooltip && (
-        <div className="fixed bottom-36 sm:bottom-24 right-4 sm:right-5 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 max-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="fixed bottom-[204px] sm:bottom-[136px] right-4 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-3 max-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-300">
           <button
             type="button"
             onClick={() => setShowTooltip(false)}
@@ -51,13 +52,14 @@ export function AIAssistant() {
         </div>
       )}
 
-      {/* Botón flotante de WhatsApp */}
+      {/* Botón flotante de WhatsApp — apilado sobre el dock móvil y DEBAJO
+          de la flecha "volver arriba" (fix V52.8 del solape) */}
       <a
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Escribir por WhatsApp"
-        className="fixed bottom-20 sm:bottom-5 right-4 sm:right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-green-500/30 transition-transform hover:scale-110 active:scale-95"
+        className="fixed bottom-[88px] sm:bottom-5 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-green-500/30 transition-transform hover:scale-110 active:scale-95"
       >
         {/* Icono de WhatsApp SVG */}
         <svg

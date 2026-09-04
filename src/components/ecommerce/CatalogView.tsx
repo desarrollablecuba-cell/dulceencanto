@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { LayoutGrid, List, ShoppingCart, Star, Heart, Eye, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice as formatGlobalPrice } from '@/store/currency-store';
+import { formatPrice as formatGlobalPrice } from '@/store/currency-store';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,7 +29,15 @@ interface Product {
   featured: boolean;
   categoryId: string;
   reservationEnabled?: boolean;
-  category: { id: string; name: string; slug: string; icon: string };
+  /** Días de antelación requeridos para reservar (V52.7). */
+  reservationDays?: number;
+  /** V52.6 — unidad de venta ('docena' → etiqueta "Por Docena" en la card). */
+  saleUnit?: string;
+  /** V52.6 — disponible en el grupo "Buffet para Repartir" de Reservas. */
+  buffetEnabled?: boolean;
+  /** V52.8 — precio de la DOCENA en el Buffet para Repartir (USD). */
+  buffetPriceUsd?: number;
+  category: { id: string; name: string; slug: string; icon: string; section?: string };
   _count?: { variantGroups: number };
 }
 
@@ -43,16 +51,15 @@ function formatPrice(cup: number, currency: 'CUP' | 'USD'): string {
   if (currency === 'USD') return `$${(cup / USD_RATE).toFixed(2)}`;
   return `₱${cup.toLocaleString('es-CU')}`;
 }
-/** Card de producto estilo Dulce Encanto (sweet-luxury) */
+/** Card de producto estilo Dulce Encanto (sweet-luxury)
+ *  V52.8 — la moneda se deduce del canal: reservables $USD / directa ₡CUP. */
 function ProductCard({
   product,
-  currency,
   isReservation,
   onAdd,
   onSelect,
 }: {
   product: Product;
-  currency: 'CUP' | 'USD';
   isReservation: boolean;
   onAdd: (qty: number) => void;
   onSelect: () => void;
@@ -64,6 +71,8 @@ function ProductCard({
   const isInWishlist = useWishlistStore((s) => s.has(product.id));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
   const hasVariants = (product._count?.variantGroups ?? 0) > 0;
+  // V52.6 — etiqueta "Por Docena" para dulces finos (se vende la docena)
+  const isDozen = product.saleUnit === 'docena';
 
   return (
     <div
@@ -74,9 +83,20 @@ function ProductCard({
       {/* Image */}
       <div className="relative aspect-square overflow-hidden" style={{ background: '#FDF2F8' }}>
         <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" />
-        {isReservation && (
-          <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: '#A855F7' }}>📅 Reserva</span>
-        )}
+        {/* Badges apilados arriba-izquierda: Reserva (si aplica) + Por Docena */}
+        <div className="absolute top-2 left-2 flex flex-col items-start gap-1 pointer-events-none">
+          {isReservation && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: '#A855F7' }}>📅 Reserva</span>
+          )}
+          {isDozen && (
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white flex items-center gap-1"
+              style={{ background: 'linear-gradient(135deg, #EC4899 0%, #F59E0B 100%)', boxShadow: '0 2px 6px rgba(236,72,153,0.35)' }}
+            >
+              🍬 Por Docena
+            </span>
+          )}
+        </div>
         <button
           className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all"
           style={{ background: 'rgba(255,255,255,0.9)' }}
@@ -108,10 +128,18 @@ function ProductCard({
           </div>
         )}
         <div className="mt-auto">
-          {/* Venta directa (isReservation=false) siempre en CUP; reservas siguen el toggle global */}
-          <p className="font-bold mb-2" style={{ fontSize: '18px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
-            {formatPrice(product.price, isReservation ? currency : 'CUP')}
+          {/* V52.8 — moneda fija por canal (petición del negocio):
+              reservables SIEMPRE $USD · venta directa SIEMPRE ₡CUP.
+              El toggle global ya no afecta los precios del catálogo. */}
+          <p className="font-bold mb-0.5 flex items-baseline justify-center gap-1" style={{ fontSize: '18px', color: '#A855F7', fontFamily: 'Georgia, serif' }}>
+            {formatPrice(product.price, isReservation ? 'USD' : 'CUP')}
+            {isDozen && <span className="text-[11px] font-semibold" style={{ color: '#9CA3AF' }}>/ docena</span>}
           </p>
+          {isReservation && (
+            <p className="text-center text-[10px] mb-1.5" style={{ color: '#9CA3AF' }}>
+              ≈ ₡{product.price.toLocaleString('es-CU')} CUP
+            </p>
+          )}
 
           {/* Quantity selector — solo en venta directa (no reservas) */}
           {!isReservation && !hasVariants && (
@@ -163,14 +191,12 @@ function ProductCard({
 function CategoryCarousel({
   category,
   products,
-  currency,
   isReservation,
   onAdd,
   onSelect,
 }: {
   category: Category;
   products: Product[];
-  currency: 'CUP' | 'USD';
   isReservation: boolean;
   onAdd: (product: Product, qty: number) => void;
   onSelect: (product: Product) => void;
@@ -226,7 +252,6 @@ function CategoryCarousel({
           <div key={p.id} className="shrink-0 w-[200px] sm:w-[220px]">
             <ProductCard
               product={p}
-              currency={currency}
               isReservation={isReservation}
               onAdd={(qty) => onAdd(p, qty)}
               onSelect={() => onSelect(p)}
@@ -245,8 +270,6 @@ export function CatalogView({ catalog }: CatalogViewProps) {
   const [loading, setLoading] = useState(true);
   const addItem = useCartStore((s) => s.addItem);
   const selectProduct = useAppStore((s) => s.selectProduct);
-  // Moneda global (sincronizada con el Header). Ya no hay toggle local.
-  const currency = useCurrencyStore((s) => s.currency);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -255,9 +278,16 @@ export function CatalogView({ catalog }: CatalogViewProps) {
       fetch(`/api/products?catalog=${catalog}&take=100`).then((r) => r.json()),
     ])
       .then(([cats, prods]) => {
+        // V52.6 — en Reservas, los productos del grupo "Buffet para Repartir"
+        // se muestran SOLO en ese grupo (no se repiten en su categoría).
+        const buffetIds = new Set(
+          catalog === 'reservation' && Array.isArray(prods)
+            ? prods.filter((p: Product) => p.buffetEnabled).map((p: Product) => p.id)
+            : []
+        );
         if (Array.isArray(cats)) {
           const catsWithProducts = cats.filter((c: Category) =>
-            Array.isArray(prods) && prods.some((p: Product) => p.categoryId === c.id)
+            Array.isArray(prods) && prods.some((p: Product) => p.categoryId === c.id && !buffetIds.has(p.id))
           );
           setCategories(catsWithProducts);
         }
@@ -267,28 +297,59 @@ export function CatalogView({ catalog }: CatalogViewProps) {
       .finally(() => setLoading(false));
   }, [catalog]);
 
+  // V52.6 — Grupo virtual "Buffet para Repartir" (sólo en Reservas):
+  // los mismos productos de Venta Directa, para repartir en eventos.
+  // V52.8 — se venden POR DOCENA a buffetPriceUsd USD (como los dulces finos):
+  // el precio mostrado/agregado al carrito usa esa docena, no el precio unitario.
+  const buffetProducts = useMemo(
+    () => (catalog === 'reservation'
+      ? products.filter((p) => p.buffetEnabled).map((p) => ({
+          ...p,
+          price: Math.round((Number(p.buffetPriceUsd) || 30) * 700),
+          saleUnit: 'docena',
+        }))
+      : []),
+    [products, catalog]
+  );
+  const buffetIds = useMemo(() => new Set(buffetProducts.map((p) => p.id)), [buffetProducts]);
+
   const productsByCategory = useMemo(() => {
     const map: Record<string, Product[]> = {};
     for (const c of categories) {
-      map[c.id] = products.filter((p) => p.categoryId === c.id);
+      // Dedupe: los del grupo Buffet no se repiten en su categoría
+      map[c.id] = products.filter((p) => p.categoryId === c.id && !buffetIds.has(p.id));
     }
     return map;
-  }, [products, categories]);
+  }, [products, categories, buffetIds]);
 
   const handleAdd = (product: Product, qty: number) => {
+    // V52.7 — el canal de venta se deduce del catálogo donde está el cliente:
+    //  - immediate  → Venta Directa (₡CUP, descuenta stock)
+    //  - reservation → Reservable ($USD, incluye el grupo Buffet para Repartir)
+    const isReservable = catalog === 'reservation';
+    // V52.8 — los productos por docena (dulces finos + buffet) se etiquetan
+    // en el carrito/pedido para que el cliente y el negocio vean la unidad.
+    const isDozenSale = isReservable && product.saleUnit === 'docena';
     const result = addItem({
       productId: product.id,
-      name: product.name,
+      name: isDozenSale ? `${product.name} — Docena` : product.name,
       price: product.price,
       image: product.image,
-      stock: product.stock,
+      stock: isReservable ? undefined : product.stock,
       quantity: qty,
+      saleMode: isReservable ? 'reservation' : 'direct',
+      isReservation: isReservable,
+      reservationDays: isReservable ? Number(product.reservationDays || 0) : 0,
     } as any);
     if (!result.ok) {
-      toast({ title: 'No se pudo agregar', description: result.reason || 'Stock insuficiente.', variant: 'destructive' });
+      toast({ title: 'No se pudo agregar', description: result.reason || 'Stock insuficiente.', variant: 'destructive', duration: 6000 });
       return;
     }
-    toast({ title: '✓ Agregado al carrito', description: `${qty}× ${product.name} — ${formatPrice(product.price * qty, catalog === 'reservation' ? currency : 'CUP')}`, duration: 2500 });
+    toast({
+      title: '✓ Agregado al carrito',
+      description: `${qty}× ${product.name} — ${formatPrice(product.price * qty, isReservable ? 'USD' : 'CUP')}`,
+      duration: 2500,
+    });
   };
 
   if (loading) {
@@ -333,9 +394,9 @@ export function CatalogView({ catalog }: CatalogViewProps) {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider hidden sm:inline" style={{ color: '#7E22CE' }}>Moneda:</span>
-            {/* Indicador de moneda global — el toggle está en el Header */}
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold" style={{ background: '#F3E8FF', color: '#7E22CE', border: '1px solid #DDD6FE' }} aria-live="polite">
-              {currency === 'CUP' ? '₱ CUP' : '$ USD'}
+            {/* V52.8 — moneda FIJA por canal: Reservas $USD · Venta Directa ₡CUP */}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold" style={{ background: catalog === 'reservation' ? '#F3E8FF' : '#ECFDF5', color: catalog === 'reservation' ? '#7E22CE' : '#047857', border: catalog === 'reservation' ? '1px solid #DDD6FE' : '1px solid #A7F3D0' }} aria-live="polite">
+              {catalog === 'reservation' ? '$ USD · reservas' : '₡ CUP · venta directa'}
             </span>
           </div>
         </div>
@@ -343,12 +404,65 @@ export function CatalogView({ catalog }: CatalogViewProps) {
         {/* View: Por categorías = carruseles por categoría */}
         {viewMode === 'categories' && (
           <div>
+            {/* V52.6 — Grupo destacado "Buffet para Repartir" (Reservas) */}
+            {catalog === 'reservation' && buffetProducts.length > 0 && (
+              <div className="mb-8">
+                <div
+                  className="rounded-2xl p-4 sm:p-5 mb-3"
+                  style={{
+                    background: 'linear-gradient(135deg, #FFF7ED 0%, #FDF2F8 55%, #FAF5FF 100%)',
+                    border: '2px solid #FED7AA',
+                    boxShadow: '0 8px 24px -8px rgba(245,158,11,0.25)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span
+                      className="flex items-center justify-center rounded-full shrink-0"
+                      style={{ width: '44px', height: '44px', background: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)', boxShadow: '0 6px 16px -4px rgba(245,158,11,0.5)' }}
+                    >
+                      <span style={{ fontSize: '22px' }} aria-hidden>🍽️</span>
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold" style={{ fontSize: '22px', color: '#2E1065', fontFamily: 'Georgia, serif' }}>
+                          Buffet para Repartir
+                        </h3>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-bold"
+                          style={{ background: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)', color: '#FFF' }}
+                        >
+                          {buffetProducts.length} productos
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm mt-0.5" style={{ color: '#9A3412' }}>
+                        Los mismos dulces y buffet de la Venta Directa, para repartir en tu evento. Se venden <strong>por docena</strong> en $USD — resérvalos junto a tu torta.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {/* Carrusel del buffet (mismo estilo que las categorías) */}
+                <div
+                  className="flex gap-4 overflow-x-auto scroll-smooth pb-2"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#F59E0B transparent' }}
+                >
+                  {buffetProducts.map((p) => (
+                    <div key={p.id} className="shrink-0 w-[200px] sm:w-[220px]">
+                      <ProductCard
+                        product={p}
+                        isReservation
+                        onAdd={(qty) => handleAdd(p, qty)}
+                        onSelect={() => selectProduct(p.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {categories.map((cat) => (
               <CategoryCarousel
                 key={cat.id}
                 category={cat}
                 products={productsByCategory[cat.id] || []}
-                currency={currency}
                 isReservation={catalog === 'reservation'}
                 onAdd={handleAdd}
                 onSelect={(p) => selectProduct(p.id)}
@@ -364,7 +478,6 @@ export function CatalogView({ catalog }: CatalogViewProps) {
               <ProductCard
                 key={p.id}
                 product={p}
-                currency={currency}
                 isReservation={catalog === 'reservation'}
                 onAdd={(qty) => handleAdd(p, qty)}
                 onSelect={() => selectProduct(p.id)}

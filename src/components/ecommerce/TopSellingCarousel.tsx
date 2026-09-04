@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight, Star, ShoppingCart, Eye, Flame, Heart } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
 import { useCartStore } from '@/store/cart-store';
-import { useCurrencyStore, formatPrice as formatCurrency, currencyForProduct } from '@/store/currency-store';
+import { formatPrice as formatCurrency, currencyForProduct, isDirectSaleProduct } from '@/store/currency-store';
 import { useWishlistStore } from '@/store/wishlist-store';
 import { useToast } from '@/hooks/use-toast';
 
@@ -73,15 +73,14 @@ export function TopSellingCarousel() {
 
   const { selectProduct, setView } = useAppStore();
   const addItem = useCartStore((s) => s.addItem);
-  const currency = useCurrencyStore((s) => s.currency);
   const { toast } = useToast();
 
-  const formatPrice = useCallback((cup: number) => formatCurrency(cup, currency), [currency]);
-  // REGLA: venta directa siempre en CUP (se paga local); reservas siguen el toggle global.
+  // V52.8 — la moneda ya no depende del toggle global:
+  // venta directa ₡CUP · reservables $USD (currencyForProduct lo decide).
   const formatPriceFor = useCallback(
     (p: { reservationEnabled?: boolean; category?: { section?: string } }, cup: number) =>
-      formatCurrency(cup, currencyForProduct(p, currency)),
-    [currency]
+      formatCurrency(cup, currencyForProduct(p, 'CUP')),
+    []
   );
 
   useEffect(() => {
@@ -107,13 +106,18 @@ export function TopSellingCarousel() {
       setView('product');
       return;
     }
+    // V52.7 — canal de venta: venta directa (₡CUP) o reservable ($USD).
+    const mode: 'direct' | 'reservation' = isDirectSaleProduct(p) ? 'direct' : 'reservation';
     const result = addItem({
       productId: p.id,
       name: p.shortName || p.name,
       price: p.price,
       image: p.image,
-      stock: p.stock,
+      stock: mode === 'reservation' ? undefined : p.stock,
       quantity: 1,
+      saleMode: mode,
+      isReservation: mode === 'reservation',
+      reservationDays: mode === 'reservation' ? Number((p as any).reservationDays || 0) : 0,
     } as any);
     if (!result.ok) {
       toast({
@@ -153,9 +157,9 @@ export function TopSellingCarousel() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Indicador de moneda (solo informativo — el toggle global está en el Header) */}
+            {/* V52.8 — leyenda de monedas por canal (fija, no depende del toggle) */}
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold" style={{ background: '#F3E8FF', color: '#7E22CE', border: '1px solid #DDD6FE' }} aria-live="polite">
-              {currency === 'CUP' ? '₱ CUP' : '$ USD'}
+              Reservas $USD · Directa ₡CUP
             </span>
 
             {/* Flechas (desktop) */}
@@ -521,19 +525,19 @@ function QuickViewModal({
               {product.description}
             </p>
 
-            {/* Precio */}
+            {/* Precio — V52.8: moneda fija por canal (directa ₡CUP / reservable $USD) */}
             <div className="mb-5">
               {offerActive && (
                 <p className="text-sm line-through mb-0.5" style={{ color: '#9CA3AF' }}>
-                  {formatCurrency(product.price, useCurrencyStore.getState().currency)}
+                  {formatCurrency(product.price, currencyForProduct(product, 'CUP'))}
                 </p>
               )}
               <div className="flex items-baseline gap-2">
                 <span className="font-bold" style={{ fontSize: '32px', color: offerActive ? '#DC2626' : '#2E1065', fontFamily: 'Georgia, serif' }}>
-                  {formatCurrency(finalPrice, useCurrencyStore.getState().currency)}
+                  {formatCurrency(finalPrice, currencyForProduct(product, 'CUP'))}
                 </span>
                 <span className="text-xs font-semibold" style={{ color: '#9CA3AF' }}>
-                  {useCurrencyStore.getState().currency === 'CUP' ? 'pesos cubanos' : 'dólares (Zelle)'}
+                  {isDirectSaleProduct(product) ? 'pesos cubanos' : 'dólares (Zelle)'}
                 </span>
               </div>
               {product.stock > 0 && (

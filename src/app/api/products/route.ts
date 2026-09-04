@@ -67,21 +67,37 @@ export async function GET(request: Request) {
     // Filtro por tipo de catálogo — la SECCIÓN de la categoría manda
     // (configurable desde el admin: Venta Directa / Reservas / Ambas):
     // - 'reservation': productos de categorías "Por Reserva" + los reservables
-    //   de categorías "Ambas".
+    //   de categorías "Ambas" + los marcados como "Buffet para Repartir"
+    //   (V52.6: los mismos productos de Venta Directa, para repartir).
     // - 'immediate': productos de categorías "Venta Directa" + los no
-    //   reservables de categorías "Ambas".
+    //   reservables de categorías "Ambas", salvo que el producto tenga
+    //   desactivada la venta directa (directSaleEnabled=false, V52.6).
     if (catalog === 'reservation' || catalog === 'immediate') {
       const cats = await db.category.findMany({ select: { id: true, section: true } });
       const inSection = cats.filter((c) => c.section === catalog).map((c) => c.id);
       const neutral = cats
         .filter((c) => c.section !== 'immediate' && c.section !== 'reservation')
         .map((c) => c.id);
-      andConditions.push({
-        OR: [
-          { categoryId: { in: inSection.length > 0 ? inSection : ['__none__'] } },
-          { categoryId: { in: neutral.length > 0 ? neutral : ['__none__'] }, reservationEnabled: catalog === 'reservation' },
-        ],
-      });
+      if (catalog === 'reservation') {
+        andConditions.push({
+          OR: [
+            { categoryId: { in: inSection.length > 0 ? inSection : ['__none__'] } },
+            { categoryId: { in: neutral.length > 0 ? neutral : ['__none__'] }, reservationEnabled: true },
+            // V52.6 — grupo "Buffet para Repartir" (disponibilidad por producto)
+            { buffetEnabled: true },
+          ],
+        });
+      } else {
+        // Venta Directa: además, el producto debe tener directSaleEnabled=true
+        // (por defecto true — sólo se apaga desde el admin).
+        where.directSaleEnabled = true;
+        andConditions.push({
+          OR: [
+            { categoryId: { in: inSection.length > 0 ? inSection : ['__none__'] } },
+            { categoryId: { in: neutral.length > 0 ? neutral : ['__none__'] }, reservationEnabled: false },
+          ],
+        });
+      }
     }
 
     if (category) {

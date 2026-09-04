@@ -54,6 +54,7 @@ import {
   Send,
   CreditCard,
   ShieldCheck,
+  Check,
   Globe,
   FolderOpen,
   ShoppingCart,
@@ -107,12 +108,18 @@ import {
   Upload,
   CalendarHeart,
   Menu,
+  FileArchive,
+  History,
+  Images,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrderTicket } from '@/components/ecommerce/OrderTicket';
 import { EventReservationsTab } from '@/components/ecommerce/admin/EventReservationsTab';
 import { HeroSlidesEditor, NavSectionsEditor, HamburgerItemsEditor } from '@/components/ecommerce/VisualEditors';
-import { PromotionManager, GalleryManager, SectionImagesEditor, ServicesManager } from '@/components/ecommerce/SectionManagers';
+import { PromotionManager, SectionImagesEditor } from '@/components/ecommerce/SectionManagers';
+// V52.9 — Servicios y Galería con editores propios de dos vistas (lista + detalle)
+import { ServicesCatalog } from '@/components/ecommerce/admin/ServicesCatalog';
+import { GalleryTab } from '@/components/ecommerce/admin/GalleryTab';
 import { CountryFlag, COUNTRY_INFO } from '@/components/ecommerce/CountryFlag';
 import { PasswordInput } from '@/components/ui/password-input';
 import {
@@ -150,6 +157,7 @@ import { OffersCarouselEditor } from '@/components/ecommerce/OffersCarouselEdito
 import { SavedThemesGallery } from '@/components/ecommerce/SavedThemesGallery';
 import { TEMPLATES as STORE_PRESETS, type StoreTemplate as StorePreset } from '@/lib/templates';
 import { uploadImage, getActiveUploads } from '@/lib/image-upload';
+import { compressImageFile } from '@/lib/compress-image';
 
 const ADMIN_TOKEN_KEY = 'diaz-admin-token';
 
@@ -312,6 +320,9 @@ interface Product {
   // SIGECOS: disponibilidad
   posAvailable?: boolean;
   tiendaAvailable?: boolean;
+  // V52.6 — canales de venta (Venta Directa / Buffet para Repartir)
+  directSaleEnabled?: boolean;
+  buffetEnabled?: boolean;
   // SIGECOS: anticipo
   advanceType?: string;
   advanceValue?: number;
@@ -854,7 +865,7 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
                     {c.productIds.length < 2 && (
                       <p className="text-[10px] text-amber-600 mb-1">⚠️ Elige al menos 2 productos para que sea un combo.</p>
                     )}
-                    <div className="max-h-44 overflow-y-auto space-y-1">
+                    <div className="max-h-44 overflow-y-auto nice-scroll space-y-1">
                       {catalog.length === 0 && <p className="text-xs text-gray-400">Cargando catálogo…</p>}
                       {catalog.map((p) => {
                         const checked = c.productIds.includes(p.id);
@@ -879,11 +890,112 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
                               <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center text-sm">🧁</div>
                             )}
                             <span className="text-xs flex-1 truncate">{p.name}</span>
-                            <span className="text-xs text-gray-500 shrink-0">₱{p.price.toLocaleString('es-CU')}</span>
+                            {/* V52.8 — doble moneda (catálogo mixto: reservables USD / directa CUP) */}
+                            <span className="text-xs text-gray-500 shrink-0">${(p.price / 700).toFixed(2)} · ₡{p.price.toLocaleString('es-CU')}</span>
                           </label>
                         );
                       })}
                     </div>
+                  </div>
+
+                  {/* ── Vista previa EN VIVO de la card del combo (V52.3) ──
+                      Espejo compacto del diseño real de PromotionsSection:
+                      se actualiza al instante al marcar productos, cambiar
+                      nombre, foto o descuento. Da confianza al admin. */}
+                  <div className="rounded-md border border-dashed border-purple-300 bg-purple-50/30 p-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-purple-500 mb-1.5 flex items-center gap-1">
+                      <Eye className="h-3 w-3" /> Vista previa en vivo — así se verá en la tienda
+                    </p>
+                    <div className="flex gap-2.5">
+                      {/* Zona de imagen (mini collage igual que la tienda) */}
+                      <div
+                        className="relative w-[104px] h-[104px] shrink-0 overflow-hidden rounded-lg"
+                        style={{ background: 'linear-gradient(135deg, #F3E8FF 0%, #FCE7F3 100%)' }}
+                      >
+                        {c.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={c.image} alt="" className="w-full h-full object-cover" />
+                        ) : (() => {
+                          const imgs = c.productIds
+                            .map((id) => catalog.find((p) => p.id === id))
+                            .filter((p) => p?.image)
+                            .slice(0, 1) as Array<{ image: string }>;
+                          return imgs[0]?.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={imgs[0].image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-3xl">🎁</div>
+                          );
+                        })()}
+                        {/* Miniaturas apiladas de los demás productos */}
+                        {c.productIds.length > 1 && !c.image && (
+                          <span className="absolute bottom-1 left-1 flex gap-1">
+                            {c.productIds
+                              .map((id) => catalog.find((p) => p.id === id))
+                              .filter((p) => p?.image)
+                              .slice(1, 3)
+                              .map((p) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={p!.id} src={p!.image} alt="" className="h-6 w-6 rounded object-cover" style={{ border: '2px solid #FFF' }} />
+                              ))}
+                            {c.productIds.length > 3 && (
+                              <span className="h-6 w-6 rounded flex items-center justify-center text-[9px] font-bold" style={{ background: 'rgba(46,16,101,0.85)', color: '#FFF', border: '2px solid #FFF' }}>
+                                +{c.productIds.length - 3}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {/* Cinta de descuento (misma clase que la tienda) */}
+                        {c.discountPct > 0 && (
+                          <span className="ribbon-discount" style={{ fontSize: 10, padding: '2px 9px 2px 12px', top: 10 }}>−{c.discountPct}%</span>
+                        )}
+                      </div>
+                      {/* Contenido de la mini-card */}
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <p className="font-bold truncate leading-tight" style={{ fontSize: '13px', color: '#2E1065', fontFamily: 'Georgia, serif' }}>
+                          {c.name || 'Nombre del combo…'}
+                        </p>
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold text-white w-fit mt-1"
+                          style={{ background: 'rgba(46,16,101,0.78)' }}
+                        >
+                          📦 {c.productIds.length} {c.productIds.length === 1 ? 'producto' : 'productos'}
+                        </span>
+                        <ul className="mt-1.5 space-y-0.5">
+                          {c.productIds.slice(0, 2).map((id) => {
+                            const p = catalog.find((x) => x.id === id);
+                            return (
+                              <li key={id} className="flex items-center gap-1 text-[10px]">
+                                <Check className="h-2.5 w-2.5 shrink-0" style={{ color: '#EC4899' }} />
+                                <span className="flex-1 truncate" style={{ color: '#374151' }}>{p?.name || '…'}</span>
+                                <span className="shrink-0 tabular-nums" style={{ color: '#6B7280' }}>₱{(p?.price || 0).toLocaleString('es-CU')}</span>
+                              </li>
+                            );
+                          })}
+                          {c.productIds.length > 2 && (
+                            <li className="text-[10px] italic pl-3.5" style={{ color: '#9CA3AF' }}>+ {c.productIds.length - 2} más</li>
+                          )}
+                        </ul>
+                        <div className="mt-auto pt-1.5 border-t flex items-end gap-2" style={{ borderColor: '#FCE7F3' }}>
+                          {c.discountPct > 0 && (
+                            <span className="text-[10px] line-through" style={{ color: '#9CA3AF' }}>₱{comboTotal.toLocaleString('es-CU')}</span>
+                          )}
+                          <span className="font-bold tabular-nums leading-none" style={{ fontSize: '15px', color: '#BE185D', fontFamily: 'Georgia, serif' }}>
+                            ₱{Math.round(comboTotal * (1 - (Math.min(100, Math.max(0, c.discountPct)) || 0) / 100)).toLocaleString('es-CU')}
+                          </span>
+                          {c.discountPct > 0 && comboTotal > 0 && (
+                            <span className="text-[9px] font-semibold" style={{ color: '#059669' }}>
+                              ahorras ₱{(comboTotal - Math.round(comboTotal * (1 - c.discountPct / 100))).toLocaleString('es-CU')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {c.productIds.length < 2 && (
+                      <p className="text-[10px] text-amber-600 mt-1.5 italic">
+                        La vista previa se activa con al menos 2 productos (en la tienda solo se muestran los combos con productos).
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -899,7 +1011,7 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
               Se muestran como mini-cards bajo la promoción. Para el nuevo formato (cards de combo multi-producto) usa
               la sección de Combos de arriba.
             </p>
-            <div className="mt-2 max-h-56 overflow-y-auto space-y-1">
+            <div className="mt-2 max-h-56 overflow-y-auto nice-scroll space-y-1">
               {catalog.length === 0 && <p className="text-xs text-gray-400">Cargando catálogo…</p>}
               {catalog.map((p) => {
                 const checked = r.productIds.includes(p.id);
@@ -924,7 +1036,8 @@ function SpecialDatesEditor({ value, onChange }: { value: string; onChange: (v: 
                       <div className="h-8 w-8 rounded bg-gray-100 flex items-center justify-center text-sm">🧁</div>
                     )}
                     <span className="text-xs flex-1 truncate">{p.name}</span>
-                    <span className="text-xs text-gray-500 shrink-0">₱{p.price.toLocaleString('es-CU')}</span>
+                    {/* V52.8 — doble moneda (catálogo mixto) */}
+                    <span className="text-xs text-gray-500 shrink-0">${(p.price / 700).toFixed(2)} · ₡{p.price.toLocaleString('es-CU')}</span>
                   </label>
                 );
               })}
@@ -1095,11 +1208,17 @@ function JsonFieldEditor({ label, value, onChange, placeholder }: { label: strin
 }
 
 // Sidebar navigation items
-type AdminTab = 'dashboard' | 'products' | 'orders' | 'delivery' | 'customers' | 'reviews' | 'reservations' | 'settings' | 'profile';
+type AdminTab = 'dashboard' | 'products' | 'services' | 'gallery' | 'orders' | 'delivery' | 'customers' | 'reviews' | 'reservations' | 'settings' | 'profile';
 
 const navItems: { tab: AdminTab; label: string; icon: React.ReactNode }[] = [
   { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
   { tab: 'products', label: 'Productos', icon: <Package className="h-5 w-5" /> },
+  // V52.8 — SERVICIOS como sección propia: es prácticamente otro catálogo
+  // (antes estaba escondido en Ajustes → Secciones).
+  { tab: 'services', label: 'Servicios', icon: <Sparkles className="h-5 w-5" /> },
+  // V52.9 — GALERÍA DE EVENTOS como sección propia (antes en Ajustes → Secciones):
+  // categorías con portada + fotos reales, CRUD completo de imágenes.
+  { tab: 'gallery', label: 'Galería', icon: <Images className="h-5 w-5" /> },
   { tab: 'orders', label: 'Pedidos', icon: <ShoppingCart className="h-5 w-5" /> },
   { tab: 'delivery', label: 'Delivery', icon: <Truck className="h-5 w-5" /> },
   { tab: 'customers', label: 'Clientes', icon: <Users className="h-5 w-5" /> },
@@ -1219,6 +1338,10 @@ function DashboardTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Centro de Descargas del código (V52.3): versión pendiente,
+          verificación dryRun sin gastar la V + historial */}
+      <DownloadCodeButton />
 
       {/* Recent Orders + Low Stock */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1348,6 +1471,11 @@ interface ProductFormState {
   // SIGECOS: disponibilidad
   posAvailable: boolean;
   tiendaAvailable: boolean;
+  // V52.6 — canales de venta (Venta Directa / Buffet para Repartir)
+  directSaleEnabled: boolean;
+  buffetEnabled: boolean;
+  // V52.8 — precio de la docena del buffet (USD)
+  buffetPriceUsd: number;
   // SIGECOS: anticipo
   advanceType: string;
   advanceValue: number;
@@ -1445,6 +1573,11 @@ const EMPTY_FORM: ProductFormState = {
   status: 'active',
   posAvailable: true,
   tiendaAvailable: true,
+  // V52.6 — canales de venta (por defecto: en Venta Directa, sin buffet)
+  directSaleEnabled: true,
+  buffetEnabled: false,
+  // V52.8 — precio de la docena del buffet (USD) — 30 por defecto
+  buffetPriceUsd: 30,
   advanceType: 'sin',
   advanceValue: 0,
   minHours: 24,
@@ -2703,6 +2836,67 @@ function WholesaleTiersEditor({
   );
 }
 
+// ─── SERVICES TAB (V52.8) ───────────────────────────────────────────────────
+// Los Servicios para Eventos son prácticamente OTRO CATÁLOGO: cards con foto,
+// precio USD, categorías y variantes. Antes vivían escondidos en
+// Ajustes → Secciones; ahora tienen su propia sección en el menú lateral,
+// al nivel de Productos. Reutiliza el ServicesManager (CRUD completo).
+
+function ServicesTab() {
+  return (
+    <div className="max-w-6xl space-y-4">
+      {/* Encabezado de la sección */}
+      <div
+        className="rounded-2xl p-4 sm:p-5"
+        style={{
+          background: 'linear-gradient(135deg, #FDF2F8 0%, #FAF5FF 55%, #FFF7ED 100%)',
+          border: '2px solid #FBCFE8',
+          boxShadow: '0 8px 24px -10px rgba(236,72,153,0.3)',
+        }}
+      >
+        <div className="flex items-start gap-3 flex-wrap">
+          <span
+            className="flex items-center justify-center rounded-2xl shrink-0"
+            style={{ width: '52px', height: '52px', background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)', boxShadow: '0 6px 16px -4px rgba(168,85,247,0.5)' }}
+            aria-hidden
+          >
+            <Sparkles className="h-6 w-6 text-white" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-bold" style={{ fontSize: '22px', color: '#2E1065', fontFamily: 'Georgia, serif' }}>
+              Servicios para Eventos
+            </h2>
+            <p className="text-sm text-gray-700 mt-1 leading-snug">
+              Un catálogo aparte del de productos: decoración, entretenimiento, muñecos sorpresa… Cada servicio tiene{' '}
+              <strong>precio en USD</strong> (el CUP se calcula solo), <strong>foto protagonista</strong> y{' '}
+              <strong>variantes con foto propia</strong> (ej: Muñeco Sorpresa → Payasita, Conejo Chispa, Coneja Maricusa).
+              Entra en un servicio para abrir su <strong>editor detallado</strong> (información, variantes y vista previa de la tienda).
+            </p>
+          </div>
+        </div>
+        {/* Chips informativos */}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#F3E8FF', color: '#7E22CE' }}>
+            💵 Precio en USD · CUP automático
+          </span>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#FCE7F3', color: '#BE185D' }}>
+            🎭 Variantes con foto
+          </span>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#ECFDF5', color: '#047857' }}>
+            🖼️ Fotos comprimidas al subir (hasta 8MB)
+          </span>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#FFF7ED', color: '#C2410C' }}>
+            📅 Se reservan desde “Reservar Evento”
+          </span>
+        </div>
+      </div>
+
+      {/* V52.9 — editor de servicios renovado: lista con preview + detalle (ServicesCatalog) */}
+      <ServicesCatalog />
+    </div>
+  );
+}
+
 function ProductsTab() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -2717,6 +2911,10 @@ function ProductsTab() {
   // Panel de categorías fusionado en la misma vista que productos.
   // Permite gestionar categorías y productos desde un único lugar, sin sub-tabs.
   const [showCategoriesPanel, setShowCategoriesPanel] = useState<boolean>(false);
+  // ── V52.7 — segmento de la lista: todos / venta directa (stock) / reserva ──
+  const [listMode, setListMode] = useState<'all' | 'direct' | 'reservation'>('all');
+  // Stock en edición inline (productId → valor del input antes de guardar)
+  const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
 
   // Form state
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
@@ -2760,6 +2958,11 @@ function ProductsTab() {
     setEditTab('info');
     setSavedFeedback(null);
     setDialogOpen(true);
+    // V52.8 — REGLA DE MONEDA DEL ADMIN: los RESERVABLES se editan en $USD
+    // (el precio guardado en BD es CUP → se divide entre 700 al cargar y se
+    // multiplica al guardar). Los de VENTA DIRECTA se editan directamente en ₡CUP.
+    const isRes = !isDirectProduct(p);
+    const toUsdAdmin = (cup: number) => Math.round((Number(cup) || 0) / 700 * 100) / 100;
     // Cargar detalle completo (con variant groups, combinations, extras)
     try {
       const res = await fetch(`/api/products/${p.id}`);
@@ -2829,7 +3032,8 @@ function ProductsTab() {
         shortName: p.shortName || '',
         sku: p.sku || '',
         description: p.description,
-        price: p.price,
+        // V52.8 — USD para reservables (40 USD), CUP para venta directa
+        price: isRes ? toUsdAdmin(p.price) : p.price,
         image: p.image,
         images: parsedImages,
         tags: parsedTags,
@@ -2846,17 +3050,22 @@ function ProductsTab() {
         // SIGECOS: disponibilidad
         posAvailable: detail?.posAvailable ?? p.posAvailable ?? true,
         tiendaAvailable: detail?.tiendaAvailable ?? p.tiendaAvailable ?? true,
+        // V52.6 — canales de venta
+        directSaleEnabled: detail?.directSaleEnabled ?? p.directSaleEnabled ?? true,
+        buffetEnabled: detail?.buffetEnabled ?? p.buffetEnabled ?? false,
+        // V52.8 — precio de la docena del buffet (USD)
+        buffetPriceUsd: Number(detail?.buffetPriceUsd ?? (p as any).buffetPriceUsd ?? 30) || 30,
         // SIGECOS: anticipo
         advanceType: (detail?.advanceType ?? p.advanceType) || 'sin',
         advanceValue: Number(detail?.advanceValue ?? p.advanceValue ?? 0),
         minHours: Number(detail?.minHours ?? p.minHours ?? 24),
         minHoursUnit: (detail?.minHoursUnit ?? p.minHoursUnit) === 'dias' ? 'dias' : 'horas',
-        // SIGECOS: costos (admin only)
-        costPrice: Number(detail?.costPrice ?? p.costPrice ?? 0),
+        // SIGECOS: costos (admin only) — misma conversión de moneda que el precio
+        costPrice: isRes ? toUsdAdmin(detail?.costPrice ?? p.costPrice ?? 0) : Number(detail?.costPrice ?? p.costPrice ?? 0),
         marginPercent: Number(detail?.marginPercent ?? p.marginPercent ?? 0),
         offerEnabled: p.offerEnabled ?? false,
         offerType: p.offerType || 'permanente',
-        offerPrice: p.offerPrice ?? 0,
+        offerPrice: isRes ? toUsdAdmin(p.offerPrice ?? 0) : (p.offerPrice ?? 0),
         offerStart: p.offerStart ?? null,
         offerEnd: p.offerEnd ?? null,
         wholesaleEnabled: detail?.wholesaleEnabled ?? p.wholesaleEnabled ?? false,
@@ -2885,7 +3094,8 @@ function ProductsTab() {
         shortName: p.shortName || '',
         sku: p.sku || '',
         description: p.description,
-        price: p.price,
+        // V52.8 — USD para reservables, CUP para venta directa
+        price: isRes ? toUsdAdmin(p.price) : p.price,
         image: p.image,
         images: p.images || '[]',
         tags: p.tags || '[]',
@@ -2899,15 +3109,20 @@ function ProductsTab() {
         status: p.status || 'active',
         posAvailable: p.posAvailable ?? true,
         tiendaAvailable: p.tiendaAvailable ?? true,
+        directSaleEnabled: p.directSaleEnabled ?? true,
+        buffetEnabled: p.buffetEnabled ?? false,
+        // V52.8 — precio de la docena del buffet (USD)
+        buffetPriceUsd: Number((p as any).buffetPriceUsd ?? 30) || 30,
         advanceType: p.advanceType || 'sin',
         advanceValue: Number(p.advanceValue ?? 0),
         minHours: Number(p.minHours ?? 24),
         minHoursUnit: p.minHoursUnit === 'dias' ? 'dias' : 'horas',
-        costPrice: Number(p.costPrice ?? 0),
+        // V52.8 — misma conversión de moneda que el precio
+        costPrice: isRes ? toUsdAdmin(p.costPrice ?? 0) : Number(p.costPrice ?? 0),
         marginPercent: Number(p.marginPercent ?? 0),
         offerEnabled: p.offerEnabled ?? false,
         offerType: p.offerType || 'permanente',
-        offerPrice: p.offerPrice ?? 0,
+        offerPrice: isRes ? toUsdAdmin(p.offerPrice ?? 0) : (p.offerPrice ?? 0),
         offerStart: p.offerStart ?? null,
         offerEnd: p.offerEnd ?? null,
         wholesaleEnabled: p.wholesaleEnabled ?? false,
@@ -3014,7 +3229,9 @@ function ProductsTab() {
         return;
       }
       if (form.offerPrice >= form.price) {
-        alert(`El precio de oferta ($${form.offerPrice.toFixed(2)}) debe ser MENOR al precio regular ($${form.price.toFixed(2)}).\n\nSi no quieres rebajar el precio, desactiva el switch "Habilitar oferta".`);
+        // V52.8 — símbolo según el canal del form (reservable USD / directa CUP)
+        const sym = (form.directSaleEnabled !== false && form.reservationEnabled !== true && categories.find((c) => c.id === form.categoryId)?.section !== 'reservation') ? '₡' : '$';
+        alert(`El precio de oferta (${sym}${form.offerPrice.toFixed(2)}) debe ser MENOR al precio regular (${sym}${form.price.toFixed(2)}).\n\nSi no quieres rebajar el precio, desactiva el switch "Habilitar oferta".`);
         setSaving(false);
         return;
       }
@@ -3045,12 +3262,27 @@ function ProductsTab() {
     }
     setSaving(true);
     try {
+      // ── V52.8 — MONEDA DEL GUARDADO ──
+      // El form edita reservables en $USD y venta directa en ₡CUP.
+      // La BD SIEMPRE guarda CUP → convertir USD×700 al guardar según el
+      // canal FINAL del form (por si el admin cambió Disponibilidad).
+      const formIsDirect =
+        form.directSaleEnabled !== false &&
+        form.reservationEnabled !== true &&
+        categories.find((c) => c.id === form.categoryId)?.section !== 'reservation';
+      const toCupAdmin = (usd: number) => Math.round((Number(usd) || 0) * 700);
+      const priceCup = formIsDirect ? Number(form.price) || 0 : toCupAdmin(form.price);
+      const costCup = formIsDirect ? Number(form.costPrice) || 0 : toCupAdmin(form.costPrice);
+      const offerCup = formIsDirect ? Number(form.offerPrice) || 0 : toCupAdmin(form.offerPrice);
       const payload = {
         name: form.name,
         shortName: form.shortName,
         sku: form.sku,
         description: form.description,
-        price: form.price,
+        // V52.8 — se guarda CUP; el form estaba en la moneda del canal
+        price: priceCup,
+        costPrice: costCup,
+        offerPrice: offerCup,
         image: form.image,
         images: form.images,
         tags: form.tags,
@@ -3067,15 +3299,18 @@ function ProductsTab() {
         status: form.status,
         posAvailable: form.posAvailable,
         tiendaAvailable: form.tiendaAvailable,
+        // V52.6 — canales de venta (Venta Directa / Buffet para Repartir)
+        directSaleEnabled: form.directSaleEnabled,
+        buffetEnabled: form.buffetEnabled,
+        // V52.8 — precio de la docena del buffet (USD)
+        buffetPriceUsd: Number(form.buffetPriceUsd) || 30,
         advanceType: form.advanceType,
         advanceValue: form.advanceValue,
         minHours: form.minHours,
         minHoursUnit: form.minHoursUnit,
-        costPrice: form.costPrice,
         marginPercent: form.marginPercent,
         offerEnabled: form.offerEnabled,
         offerType: form.offerType,
-        offerPrice: form.offerPrice,
         offerStart: form.offerStart,
         offerEnd: form.offerEnd,
         wholesaleEnabled: form.wholesaleEnabled,
@@ -3237,6 +3472,60 @@ function ProductsTab() {
     }));
   }, [products, categories]);
 
+  // ── V52.7 — clasificación por canal de venta ──
+  // Venta Directa (₡CUP, se gestiona el stock): directSaleEnabled y NO es
+  // reservable (reservationEnabled=false y categoría no "Por Reserva").
+  // El resto (tortas, pasteles, dulces finos, buffet) → Por Reserva ($USD).
+  const isDirectProduct = useCallback((p: Product) => {
+    if (p.directSaleEnabled === false) return false;
+    if (p.reservationEnabled === true) return false;
+    const cat = categories.find((c) => c.id === p.categoryId);
+    if (cat?.section === 'reservation') return false;
+    return true;
+  }, [categories]);
+
+  const directProducts = useMemo(
+    () => products.filter((p) => isDirectProduct(p)).sort((a, b) => a.name.localeCompare(b.name)),
+    [products, isDirectProduct]
+  );
+  const reservationProducts = useMemo(
+    () => products.filter((p) => !isDirectProduct(p)).sort((a, b) => a.name.localeCompare(b.name)),
+    [products, isDirectProduct]
+  );
+
+  // V52.7 — guardar el stock de un producto de Venta Directa (edición inline)
+  const saveStock = async (p: Product, newStock: number) => {
+    const stock = Math.max(0, Math.floor(Number(newStock) || 0));
+    // Optimista: actualizar la tabla al instante
+    setProducts((cur) => cur.map((x) => (x.id === p.id ? { ...x, stock } : x)));
+    setStockEdits((cur) => {
+      const next = { ...cur };
+      delete next[p.id];
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/admin/products/${p.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSavedFeedback(`Stock de "${p.name}" actualizado: ${stock} u.`);
+      setTimeout(() => setSavedFeedback(null), 2500);
+    } catch {
+      // Revertir al valor previo si falla
+      setProducts((cur) => cur.map((x) => (x.id === p.id ? { ...x, stock: p.stock } : x)));
+      setSavedFeedback(`⚠️ No se pudo guardar el stock de "${p.name}"`);
+      setTimeout(() => setSavedFeedback(null), 3500);
+    }
+  };
+
+  const bumpStock = (p: Product, delta: number) => {
+    const current = stockEdits[p.id] ?? p.stock;
+    const next = Math.max(0, current + delta);
+    setStockEdits((cur) => ({ ...cur, [p.id]: next }));
+  };
+
   // Drag & Drop: reordenar productos dentro de una categoría
   const handleDragStart = (e: React.DragEvent, productId: string) => {
     setDraggedId(productId);
@@ -3383,9 +3672,193 @@ function ProductsTab() {
         </div>
       )}
 
-      {/* Productos agrupados por categoría */}
+      {/* V52.7 — Segmento: Todos / Venta Directa (stock) / Por Reserva */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-white border border-gray-200 shadow-sm">
+        {([
+          ['all', '🍽️ Todos', products.length],
+          ['direct', '🛒 Venta Directa (stock ₡)', directProducts.length],
+          ['reservation', '📅 Por Reserva ($)', reservationProducts.length],
+        ] as const).map(([id, label, count]) => (
+          <button
+            key={id}
+            onClick={() => setListMode(id)}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              listMode === id
+                ? id === 'direct'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : id === 'reservation'
+                    ? 'bg-purple-600 text-white shadow'
+                    : 'bg-gray-900 text-white shadow'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {label}
+            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${listMode === id ? 'bg-white/25' : 'bg-gray-100'}`}>{count}</span>
+          </button>
+        ))}
+        {listMode === 'direct' && (
+          <p className="text-[11px] text-gray-500 ml-1 leading-tight hidden md:block">
+            Aquí agregas el stock de los productos que se venden hoy (₡CUP). El resto del catálogo es Por Reserva ($USD).
+          </p>
+        )}
+      </div>
+
+      {/* V52.7 — Banner de feedback de stock inline */}
+      {savedFeedback && listMode === 'direct' && (
+        <div className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 text-sm font-medium flex items-center gap-2">
+          <Check className="h-4 w-4" /> {savedFeedback}
+        </div>
+      )}
+
+      {/* ── V52.7 — PANEL: gestión de stock de VENTA DIRECTA ── */}
+      {listMode === 'direct' && (
+        <Card className="overflow-hidden border-emerald-200">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-50 to-lime-50 border-b border-emerald-200">
+            <Store className="h-5 w-5 text-emerald-600" />
+            <h3 className="text-lg font-bold text-gray-900">Venta Directa — Control de Stock</h3>
+            <Badge variant="secondary" className="ml-auto bg-emerald-100 text-emerald-700 border-emerald-200">
+              {directProducts.reduce((s, p) => s + p.stock, 0)} unidades · {directProducts.filter((p) => p.stock === 0).length} agotados
+            </Badge>
+          </div>
+          <div className="p-3">
+            {directProducts.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">
+                No hay productos de Venta Directa. Marca un producto con 🛒 Venta Directa en su pestaña «Disponibilidad».
+              </p>
+            ) : (
+              <div className="max-h-[420px] overflow-y-auto nice-scroll">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Img</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="w-28">Precio (₡)</TableHead>
+                      <TableHead className="w-56">Stock disponible</TableHead>
+                      <TableHead className="w-20 text-right">Editar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {directProducts.map((p) => {
+                      const editing = p.id in stockEdits;
+                      const shown = stockEdits[p.id] ?? p.stock;
+                      return (
+                        <TableRow key={p.id} className={editing ? 'bg-amber-50' : 'hover:bg-gray-50'}>
+                          <TableCell>
+                            <img src={p.image || '/products/placeholder.svg'} alt={p.name} className="w-10 h-10 rounded object-cover" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="truncate font-medium max-w-[220px]" title={p.name}>{p.name}</span>
+                              {p.saleUnit === 'docena' && (
+                                <Badge variant="outline" className="shrink-0 bg-purple-100 text-purple-700 border-purple-200 text-[10px]">×12</Badge>
+                              )}
+                              {p.buffetEnabled && (
+                                <Badge variant="outline" className="shrink-0 bg-amber-100 text-amber-700 border-amber-200 text-[10px]">🍽️ Buffet</Badge>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-gray-400">{categories.find((c) => c.id === p.categoryId)?.name}</span>
+                          </TableCell>
+                          <TableCell className="font-bold text-emerald-700">₡{p.price.toLocaleString('es-CU')}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => bumpStock(p, -1)}
+                                className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center font-bold transition-colors"
+                                aria-label={`Quitar 1 de ${p.name}`}
+                              >−</button>
+                              <input
+                                type="number"
+                                min={0}
+                                value={shown}
+                                onChange={(e) => setStockEdits((cur) => ({ ...cur, [p.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                                onBlur={() => { if (editing && shown !== p.stock) saveStock(p, shown); else if (editing) setStockEdits((cur) => { const n = { ...cur }; delete n[p.id]; return n; }); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                className={`w-16 text-center font-bold rounded-md border py-1 ${shown === 0 ? 'border-red-300 text-red-600 bg-red-50' : 'border-emerald-200 text-emerald-700'}`}
+                                aria-label={`Stock de ${p.name}`}
+                              />
+                              <button
+                                onClick={() => bumpStock(p, +1)}
+                                className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center justify-center font-bold transition-colors"
+                                aria-label={`Añadir 1 de ${p.name}`}
+                              >+</button>
+                              {editing && shown !== p.stock && (
+                                <button
+                                  onClick={() => saveStock(p, shown)}
+                                  className="ml-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition-colors"
+                                >
+                                  Guardar
+                                </button>
+                              )}
+                            </div>
+                            {shown === 0 && <span className="text-[10px] text-red-500 font-semibold">AGOTADO</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 mt-2 px-1">
+              ⓘ Los cambios se guardan al pulsar <strong>Enter</strong>, al salir del campo o con el botón <strong>Guardar</strong>. Se descontará stock cuando un cliente complete su pedido de venta directa.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* ── V52.7 — PANEL: catálogo POR RESERVA (información) ── */}
+      {listMode === 'reservation' && (
+        <Card className="overflow-hidden border-purple-200">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-200">
+            <CalendarHeart className="h-5 w-5 text-purple-600" />
+            <h3 className="text-lg font-bold text-gray-900">Por Reserva — Catálogo con antelación</h3>
+            <Badge variant="secondary" className="ml-auto bg-purple-100 text-purple-700 border-purple-200">{reservationProducts.length} productos ($USD)</Badge>
+          </div>
+          <div className="p-3">
+            {reservationProducts.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">No hay productos marcados como reservables.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[420px] overflow-y-auto nice-scroll p-1">
+                {reservationProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => openEdit(p)}
+                    className="rounded-xl overflow-hidden text-left border border-purple-100 bg-white hover:border-purple-300 hover:shadow transition-all"
+                  >
+                    <div className="relative aspect-[4/3] bg-gray-100">
+                      <img src={p.image || '/products/placeholder.svg'} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
+                      {(p.reservationDays ?? 0) > 0 && (
+                        <span className="absolute bottom-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/90 text-white">⏳ {p.reservationDays}d</span>
+                      )}
+                      {p.saleUnit === 'docena' && (
+                        <span className="absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: 'linear-gradient(135deg,#EC4899,#F59E0B)' }}>🍬 Docena</span>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-[11px] font-semibold truncate" title={p.name}>{p.name}</p>
+                      <p className="text-[10px] text-gray-500">
+                        <span className="font-bold text-purple-700">${(p.price / 700).toFixed(2)}</span> · ₡{p.price.toLocaleString('es-CU')}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400 mt-2 px-1">
+              ⓘ Estos productos se piden con antelación (días configurables por producto) y se pagan en $ USD. Toca una card para editarla.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Productos agrupados por categoría (solo en modo «Todos») */}
       <div className="space-y-4">
-        {groupedProducts.map(({ category, products: catProducts }) => {
+        {listMode === 'all' && groupedProducts.map(({ category, products: catProducts }) => {
           const isCollapsed = collapsedCats.has(category.id);
           return (
             <Card key={category.id} className="overflow-hidden">
@@ -3446,8 +3919,32 @@ function ProductsTab() {
                             <TableCell>
                               <img src={p.image || '/products/placeholder.svg'} alt={p.name} className="w-10 h-10 rounded object-cover" />
                             </TableCell>
-                            <TableCell className="font-medium max-w-[200px] truncate">{p.name}</TableCell>
-                            <TableCell className="font-semibold">${p.price.toFixed(2)}</TableCell>
+                            <TableCell className="font-medium max-w-[240px]">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="truncate">{p.name}</span>
+                                {p.buffetEnabled && (
+                                  <Badge variant="outline" className="shrink-0 bg-amber-100 text-amber-700 border-amber-200 text-[10px] whitespace-nowrap" title="Disponible en Buffet para Repartir (Reservas)">
+                                    🍽️ Buffet
+                                  </Badge>
+                                )}
+                                {p.saleUnit === 'docena' && (
+                                  <Badge variant="outline" className="shrink-0 bg-purple-100 text-purple-700 border-purple-200 text-[10px] whitespace-nowrap" title="Se vende por docena (12 unidades)">
+                                    ×12
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {/* V52.8 — moneda por canal: directa ₡CUP · reservable $USD (+CUP ref) */}
+                              {isDirectProduct(p) ? (
+                                <span className="text-emerald-700">₡{p.price.toLocaleString('es-CU')}</span>
+                              ) : (
+                                <span className="whitespace-nowrap">
+                                  <span className="text-purple-700">${(p.price / 700).toFixed(2)}</span>{' '}
+                                  <span className="text-[10px] text-gray-400">· ₡{p.price.toLocaleString('es-CU')}</span>
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <span className={`text-sm font-medium ${p.stock <= 5 ? 'text-red-500' : 'text-gray-700'}`}>
                                 {p.stock}
@@ -3609,6 +4106,7 @@ function ProductsTab() {
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="unidad">unidad</SelectItem>
+                                <SelectItem value="docena">docena (12 unidades)</SelectItem>
                                 <SelectItem value="kg">kg</SelectItem>
                                 <SelectItem value="lb">lb</SelectItem>
                                 <SelectItem value="litro">litro</SelectItem>
@@ -3645,34 +4143,54 @@ function ProductsTab() {
                             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} />
                           </div>
 
-                          {/* Precios y stock */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                              <Label>Precio de costo (USD)</Label>
-                              <Input type="number" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                            <div>
-                              <Label>Precio de venta (USD)</Label>
-                              <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                            <div>
-                              <Label className="flex items-center gap-1.5">
-                                Stock
-                                {stockFrozen && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
-                                    <Lock className="h-2.5 w-2.5" /> Congelado
-                                  </span>
-                                )}
-                              </Label>
-                              <Input
-                                type="number"
-                                value={stockFrozen ? computedStock : form.stock}
-                                disabled={stockFrozen}
-                                onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })}
-                                className={stockFrozen ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : ''}
-                              />
-                            </div>
-                          </div>
+                          {/* Precios y stock — V52.8: moneda según el canal del form.
+                              Reservable → $USD (se guarda ×700) · Venta Directa → ₡CUP */}
+                          {(() => {
+                            const formIsDirect =
+                              form.directSaleEnabled !== false &&
+                              form.reservationEnabled !== true &&
+                              categories.find((c) => c.id === form.categoryId)?.section !== 'reservation';
+                            return (
+                              <>
+                                <div className="p-3 rounded-lg flex items-center gap-2 text-xs font-semibold"
+                                  style={{ background: formIsDirect ? '#ECFDF5' : '#F3E8FF', border: `1px solid ${formIsDirect ? '#A7F3D0' : '#DDD6FE'}`, color: formIsDirect ? '#047857' : '#6D28D9' }}>
+                                  {formIsDirect ? '🛒 Venta directa: precios en ₡ CUP' : '📅 Por reserva: precios en $ USD'}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                  <div>
+                                    <Label>Precio de costo {formIsDirect ? '(₡ CUP)' : '(USD)'}</Label>
+                                    <Input type="number" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: parseFloat(e.target.value) || 0 })} />
+                                  </div>
+                                  <div>
+                                    <Label>Precio de venta {formIsDirect ? '(₡ CUP)' : '(USD)'}</Label>
+                                    <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} />
+                                    <p className="text-[10px] text-gray-500 mt-1">
+                                      {formIsDirect
+                                        ? `≈ $${((Number(form.price) || 0) / 700).toFixed(2)} USD`
+                                        : `≈ ₡${Math.round((Number(form.price) || 0) * 700).toLocaleString('es-CU')} CUP (tasa 700)`}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <Label className="flex items-center gap-1.5">
+                                      Stock
+                                      {stockFrozen && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                          <Lock className="h-2.5 w-2.5" /> Congelado
+                                        </span>
+                                      )}
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      value={stockFrozen ? computedStock : form.stock}
+                                      disabled={stockFrozen}
+                                      onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })}
+                                      className={stockFrozen ? 'bg-gray-100 text-gray-700 cursor-not-allowed' : ''}
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
 
                           {/* Aviso: stock congelado cuando hay variantes/combinaciones */}
                           {stockFrozen && (
@@ -3733,6 +4251,87 @@ function ProductsTab() {
                       <h2 className="text-xl font-bold text-gray-900 mb-1">Disponibilidad</h2>
                       <p className="text-sm text-gray-700 mb-6">Dónde se vende el producto y reglas de anticipo (SIGECOS).</p>
                       <div className="space-y-5">
+                        {/* V52.6 — Selector fácil de canales: Venta Directa / Buffet para Repartir */}
+                        <div className="p-4 sm:p-5 rounded-xl border-2 border-pink-200 bg-gradient-to-br from-pink-50 via-purple-50 to-amber-50">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Store className="h-4 w-4 text-pink-600" />
+                            <h3 className="text-sm font-bold text-gray-900">¿Dónde estará disponible este producto?</h3>
+                          </div>
+                          <p className="text-xs text-gray-700 mb-4">
+                            Elige en qué secciones de la tienda lo verán los clientes. Puede estar en ambas a la vez.
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <label
+                              className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${form.directSaleEnabled ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 accent-emerald-600 cursor-pointer"
+                                checked={form.directSaleEnabled}
+                                onChange={(e) => setForm({ ...form, directSaleEnabled: e.target.checked })}
+                              />
+                              <span className="flex-1">
+                                <span className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                                  <span style={{ fontSize: '16px' }}>🛒</span> Venta Directa
+                                </span>
+                                <span className="block text-xs text-gray-700 mt-0.5">
+                                  Aparece en la sección <strong>Venta Directa</strong> (se paga en CUP al recibir).
+                                </span>
+                              </span>
+                            </label>
+                            <label
+                              className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${form.buffetEnabled ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 accent-amber-600 cursor-pointer"
+                                checked={form.buffetEnabled}
+                                onChange={(e) => setForm({ ...form, buffetEnabled: e.target.checked })}
+                              />
+                              <span className="flex-1">
+                                <span className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                                  <span style={{ fontSize: '16px' }}>🍽️</span> Buffet para Repartir
+                                </span>
+                                <span className="block text-xs text-gray-700 mt-0.5">
+                                  Aparece en la categoría <strong>“Buffet para Repartir”</strong> dentro de <strong>Reservas</strong>.
+                                </span>
+                              </span>
+                            </label>
+                          </div>
+                          {!form.directSaleEnabled && !form.buffetEnabled && form.reservationEnabled !== true && (
+                            <p className="text-xs text-amber-700 mt-3 flex items-start gap-1.5">
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                              Con ambos canales apagados el producto sólo se verá si su categoría es “Por Reserva”.
+                            </p>
+                          )}
+                          {/* V52.8 — Precio del buffet por DOCENA (USD), como los dulces finos */}
+                          {form.buffetEnabled && (
+                            <div className="mt-4 p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-lg" aria-hidden>🍽️</span>
+                                <h4 className="text-sm font-bold text-amber-900">Precio del Buffet — por docena</h4>
+                              </div>
+                              <div className="flex flex-wrap items-end gap-3">
+                                <div className="w-40">
+                                  <Label className="text-xs font-semibold text-amber-800">Precio USD / docena</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.50"
+                                    min="0"
+                                    value={form.buffetPriceUsd}
+                                    onChange={(e) => setForm({ ...form, buffetPriceUsd: parseFloat(e.target.value) || 0 })}
+                                    className="font-bold"
+                                  />
+                                </div>
+                                <p className="text-xs text-amber-700 flex-1 min-w-[180px] leading-snug">
+                                  En <strong>Reservas → Buffet para Repartir</strong> este producto se vende <strong>por docena (12 unidades)</strong> en <strong>$USD</strong> (Zelle), igual que los dulces finos.
+                                  <span className="block mt-0.5 opacity-80">≈ ₡{Math.round((Number(form.buffetPriceUsd) || 0) * 700).toLocaleString('es-CU')} CUP la docena (tasa 700)</span>
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                             <Switch id="tiendaAvailable" checked={form.tiendaAvailable} onCheckedChange={(v) => setForm({ ...form, tiendaAvailable: v })} />
@@ -3855,7 +4454,10 @@ function ProductsTab() {
                           </Select>
                         </div>
                         <div>
-                          <Label>Precio de oferta (USD)</Label>
+                          {/* V52.8 — moneda del canal: reservable $USD / directa ₡CUP */}
+                          <Label>
+                            Precio de oferta {form.directSaleEnabled !== false && form.reservationEnabled !== true && categories.find((c) => c.id === form.categoryId)?.section !== 'reservation' ? '(₡ CUP)' : '(USD)'}
+                          </Label>
                           <Input type="number" step="0.01" value={form.offerPrice} onChange={(e) => setForm({ ...form, offerPrice: parseFloat(e.target.value) || 0 })} />
                         </div>
                         {form.offerType === 'temporada' && (
@@ -4259,16 +4861,15 @@ function CategoriesTab() {
       alert('Formato no válido. Solo JPG, PNG, WebP o GIF.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Archivo demasiado grande. Máximo 5 MB.');
-      return;
-    }
 
     setUploadingImage(true);
     try {
+      // V52.5: comprimir EN EL CLIENTE (fix del 502 con fotos de móvil de
+      // 8MB+) — ya no se rechaza por peso, se optimiza automáticamente.
+      const compressed = await compressImageFile(file, { maxEdge: 1000, targetBytes: 600 * 1024 });
       const token = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressed);
 
       const res = await fetch('/api/admin/categories/upload' + (token ? `?token=${encodeURIComponent(token)}` : ''), {
         method: 'POST',
@@ -5700,9 +6301,9 @@ function OrderDetailModal({ order, open, onClose, onPrintTicket80, onTogglePaid,
                           </div>
                         </td>
                         <td className="p-2 text-right text-gray-700">{item.quantity}</td>
-                        <td className="p-2 text-right text-gray-700">${item.price.toFixed(2)}</td>
+                        <td className="p-2 text-right text-gray-700">₡{item.price.toLocaleString('es-CU')}</td>
                         <td className="p-2 text-right font-semibold text-gray-900">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ₡{(item.price * item.quantity).toLocaleString('es-CU')}
                         </td>
                       </tr>
                     );
@@ -5712,26 +6313,26 @@ function OrderDetailModal({ order, open, onClose, onPrintTicket80, onTogglePaid,
             </div>
           </div>
 
-          {/* Totales */}
+          {/* Totales — V52.8: los pedidos se guardan en ₡CUP (BD) */}
           <div className="flex justify-end">
             <div className="w-full sm:w-72 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">${subtotal.toFixed(2)}</span>
+                <span className="font-medium">₡{subtotal.toLocaleString('es-CU')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Envío{order.deliveryZoneName ? ` · ${order.deliveryZoneName}` : ''}</span>
-                <span className="font-medium">${order.shippingCost.toFixed(2)}</span>
+                <span className="font-medium">₡{order.shippingCost.toLocaleString('es-CU')}</span>
               </div>
               {order.deliverySurcharge > 0 && !order.hasReservableItems && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Costo de Entrega Prioritaria ⚡</span>
-                  <span className="font-medium text-brand-dark">+${order.deliverySurcharge.toFixed(2)}</span>
+                  <span className="font-medium text-brand-dark">+₡{order.deliverySurcharge.toLocaleString('es-CU')}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
                 <span>Total</span>
-                <span className="text-brand-dark">${order.total.toFixed(2)}</span>
+                <span className="text-brand-dark">₡{order.total.toLocaleString('es-CU')}</span>
               </div>
               {!order.isPaid && (
                 <div className="mt-2 text-center font-bold border border-yellow-300 bg-yellow-50 text-yellow-800 rounded p-2">
@@ -6578,12 +7179,16 @@ function ProfileTab() {
   );
 }
 
-function SettingsTab() {
+function SettingsTab({ onNavigate }: { onNavigate?: (tab: AdminTab) => void }) {
   const [config, setConfig] = useState<SiteConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedField, setSavedField] = useState<string | null>(null);
   const [activeSettingsTab, setActiveSettingsTab] = useState<string>('tienda');
+  // V52.8 — acceso directo a la nueva sección «Servicios»
+  const goServices = () => { if (onNavigate) { onNavigate('services'); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+  // V52.9 — acceso directo a la nueva sección «Galería»
+  const goGallery = () => { if (onNavigate) { onNavigate('gallery'); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
 
   useEffect(() => {
     (async () => {
@@ -7366,17 +7971,41 @@ function SettingsTab() {
             </CardContent>
           </Card>
 
-          {/* Servicios para Eventos */}
+              {/* Servicios para Eventos — V52.8: ahora es una SECCIÓN propia del menú
+                  lateral ("Servicios", al nivel de Productos). Aquí sólo dejamos
+                  un acceso directo para quien venía buscándolo aquí. */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-brand" />
                 🎨 Servicios para Eventos
               </CardTitle>
-              <p className="text-sm text-gray-500">Gestiona los servicios para eventos: nombre, descripción, precios CUP/USD, categoría, orden y la <strong>foto protagonista</strong> de la card vertical (pullover personalizado, muñeca sorpresa, decoración…). Se muestran en la sección Servicios y en el modal de reserva de eventos.</p>
+              <p className="text-sm text-gray-500">
+                Los servicios ahora se gestionan en su propia sección del menú lateral — es prácticamente otro catálogo.
+              </p>
             </CardHeader>
             <CardContent>
-              <ServicesManager />
+              <div
+                className="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md"
+                style={{ background: 'linear-gradient(135deg, #FDF2F8 0%, #FAF5FF 100%)', borderColor: '#FBCFE8' }}
+                onClick={goServices}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goServices(); }}
+              >
+                <span
+                  className="flex items-center justify-center rounded-xl shrink-0"
+                  style={{ width: '44px', height: '44px', background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}
+                  aria-hidden
+                >
+                  <Sparkles className="h-5 w-5 text-white" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm" style={{ color: '#2E1065' }}>Abrir sección «Servicios»</p>
+                  <p className="text-xs text-gray-700">Cards con foto, precio USD, variantes y orden.</p>
+                </div>
+                <span className="text-sm font-bold shrink-0" style={{ color: '#7E22CE' }}>Ir →</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -7412,17 +8041,41 @@ function SettingsTab() {
             </CardContent>
           </Card>
 
-          {/* Galería de Eventos */}
+          {/* Galería de Eventos — V52.9: ahora es una SECCIÓN propia del menú
+              lateral ("Galería", al nivel de Productos/Servicios). Aquí sólo
+              dejamos un acceso directo para quien venía buscándola aquí. */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ImagePlus className="h-5 w-5 text-brand" />
+                <Images className="h-5 w-5 text-brand" />
                 🖼️ Galería de Eventos
               </CardTitle>
-              <p className="text-sm text-gray-500">Gestiona las categorías de la galería (15 Años, Bodas, Cumpleaños…): portada, fotos reales de eventos, agregar, editar, eliminar y reordenar. Los clientes las ven en un carrusel con vista ampliada.</p>
+              <p className="text-sm text-gray-500">
+                La galería ahora se gestiona en su propia sección del menú lateral — con editor completo de fotos por categoría.
+              </p>
             </CardHeader>
             <CardContent>
-              <GalleryManager />
+              <div
+                className="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md"
+                style={{ background: 'linear-gradient(135deg, #FDF2F8 0%, #FAF5FF 100%)', borderColor: '#FBCFE8' }}
+                onClick={goGallery}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goGallery(); }}
+              >
+                <span
+                  className="flex items-center justify-center rounded-xl shrink-0"
+                  style={{ width: '44px', height: '44px', background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }}
+                  aria-hidden
+                >
+                  <Images className="h-5 w-5 text-white" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm" style={{ color: '#2E1065' }}>Abrir sección «Galería»</p>
+                  <p className="text-xs text-gray-700">Categorías con portada y fotos reales: agregar, editar, eliminar.</p>
+                </div>
+                <span className="text-sm font-bold shrink-0" style={{ color: '#7E22CE' }}>Ir →</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -10055,11 +10708,35 @@ function ReviewsTab() {
   );
 }
 
-// ─── Download source code button ─────────────────────────────────────────────
+// ─── Centro de Descargas del código (Dashboard, V52.3) ─────────────────────
 function DownloadCodeButton() {
+  // ── Estadísticas: próxima versión pendiente + historial (solo lectura) ──
+  const [stats, setStats] = useState<{
+    pendingVersion: number;
+    totalDownloads: number;
+    lastDownloadAt: string | null;
+    history: { version: number; fecha: string; archivos: number; bytesZip: number }[];
+  } | null>(null);
   const [status, setStatus] = useState<'idle' | 'preparing' | 'done' | 'error'>('idle');
   const [fileCount, setFileCount] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  // ── Verificación del paquete (dryRun: NO consume la versión pendiente) ──
+  const [verify, setVerify] = useState<{
+    state: 'idle' | 'checking' | 'ok' | 'error';
+    version?: string;
+    files?: number;
+    mb?: string;
+    msg?: string;
+  }>({ state: 'idle' });
+
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/download/stats');
+      if (res.ok) setStats(await res.json());
+    } catch { /* silencioso — el panel funciona sin stats */ }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   const handleDownload = async () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
@@ -10102,7 +10779,8 @@ function DownloadCodeButton() {
       URL.revokeObjectURL(url);
 
       setStatus('done');
-      setTimeout(() => setStatus('idle'), 3000);
+      // Refrescar stats: la descarga consumió la versión pendiente
+      setTimeout(() => { loadStats(); setStatus('idle'); }, 1500);
     } catch (err) {
       console.error('Download error:', err);
       if (!errorMsg) {
@@ -10113,47 +10791,190 @@ function DownloadCodeButton() {
     }
   };
 
+  // Verifica que el paquete se genera bien y qué versión entregaría, SIN
+  // consumir el número (dryRun). Lee solo los headers y aborta la descarga
+  // del cuerpo (7 MB) para no gastar ancho de banda.
+  const handleVerify = async () => {
+    setVerify({ state: 'checking' });
+    const ctrl = new AbortController();
+    try {
+      const res = await fetch('/api/download?dryRun=1', { signal: ctrl.signal });
+      const version = res.headers.get('X-Version') || '?';
+      const files = res.headers.get('X-File-Count') || '0';
+      const bytes = res.headers.get('Content-Length') || '0';
+      const isDry = res.headers.get('X-Dry-Run');
+      const ok = res.ok && isDry === 'true';
+      setVerify({
+        state: ok ? 'ok' : 'error',
+        version,
+        files: Number(files) || 0,
+        mb: (Number(bytes) / (1024 * 1024)).toFixed(2),
+        msg: ok ? undefined : 'El paquete se generó pero sin cabecera de dryRun.',
+      });
+      ctrl.abort(); // descartar el cuerpo — solo queríamos los headers
+    } catch (err) {
+      // AbortError = cancelamos nosotros tras leer headers → verificación OK
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setVerify({ state: 'error', msg: 'No se pudo verificar el paquete. Revisa el log del servidor.' });
+    } finally {
+      setTimeout(() => setVerify({ state: 'idle' }), 12000);
+    }
+  };
+
+  const fmtDate = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('es-CU', { day: '2-digit', month: 'short', year: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString('es-CU', { hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+  };
+  const fmtBytes = (b: number) => `${(b / (1024 * 1024)).toFixed(2)} MB`;
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-      <Button
-        onClick={handleDownload}
-        disabled={status === 'preparing'}
-        className="bg-brand hover:bg-amber-600 text-white"
-      >
-        {status === 'preparing' ? (
-          <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Preparando zip…</>
-        ) : status === 'done' ? (
-          <><CheckCircle2 className="h-4 w-4 mr-2" /> Descargado</>
-        ) : (
-          <><Download className="h-4 w-4 mr-2" /> Descargar Código</>
-        )}
-      </Button>
-      {fileCount !== null && status === 'done' && (
-        <span className="text-sm text-gray-600">
-          {fileCount} archivos incluidos en el paquete.
-        </span>
-      )}
-      {status === 'error' && (
-        <div className="flex flex-col gap-2">
-          <span className="text-sm text-red-600">
-            {errorMsg || 'No se pudo generar el paquete. Intenta de nuevo.'}
-          </span>
-          {errorMsg.includes('sesión') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-amber-600 border-amber-300 hover:bg-amber-50 w-fit"
-              onClick={() => {
-                localStorage.removeItem(ADMIN_TOKEN_KEY);
-                window.location.href = '/admin';
-              }}
-            >
-              Ir a iniciar sesión
-            </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 flex-wrap">
+          <FileArchive className="h-5 w-5 text-brand" />
+          Centro de Descargas del Código
+          {stats && (
+            <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 ml-auto">
+              Próxima: V{stats.pendingVersion}
+            </Badge>
           )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Resumen: versión pendiente + historial */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Versión pendiente</p>
+            <p className="text-xl font-bold text-amber-900">
+              {stats ? `V${stats.pendingVersion}` : '—'}
+            </p>
+            <p className="text-[10px] text-amber-700/80">la recibirá tu próxima descarga</p>
+          </div>
+          <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">Paquetes servidos</p>
+            <p className="text-xl font-bold text-purple-900">
+              {stats ? stats.totalDownloads : '—'}
+            </p>
+            <p className="text-[10px] text-purple-700/80">desde V50</p>
+          </div>
+          <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-green-700">Última descarga</p>
+            <p className="text-sm font-bold text-green-900 leading-tight pt-1">
+              {stats?.lastDownloadAt ? fmtDate(stats.lastDownloadAt) : 'sin descargas'}
+            </p>
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Acciones */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Button
+            onClick={handleDownload}
+            disabled={status === 'preparing'}
+            className="bg-brand hover:bg-amber-600 text-white"
+          >
+            {status === 'preparing' ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Preparando zip…</>
+            ) : status === 'done' ? (
+              <><CheckCircle2 className="h-4 w-4 mr-2" /> Descargado</>
+            ) : (
+              <><Download className="h-4 w-4 mr-2" /> Descargar Código (V{stats?.pendingVersion ?? '…'})
+            </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleVerify}
+            disabled={verify.state === 'checking'}
+            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+            title="Genera y verifica el paquete SIN consumir la versión pendiente"
+          >
+            {verify.state === 'checking' ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Verificando…</>
+            ) : (
+              <><ShieldCheck className="h-4 w-4 mr-2" /> Verificar paquete (sin gastar la V)</>
+            )}
+          </Button>
+        </div>
+
+        {/* Resultado de la verificación */}
+        {verify.state === 'ok' && (
+          <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            Paquete OK — entregaría <strong>dulce-encanto-{verify.version}.zip</strong> ·{' '}
+            {verify.files} archivos · {verify.mb} MB · la versión pendiente <strong>NO se consumió</strong>.
+          </div>
+        )}
+        {verify.state === 'error' && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {verify.msg || 'Verificación fallida.'}
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-red-600">
+              {errorMsg || 'No se pudo generar el paquete. Intenta de nuevo.'}
+            </span>
+            {errorMsg.includes('sesión') && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-amber-600 border-amber-300 hover:bg-amber-50 w-fit"
+                onClick={() => {
+                  localStorage.removeItem(ADMIN_TOKEN_KEY);
+                  window.location.href = '/admin';
+                }}
+              >
+                Ir a iniciar sesión
+              </Button>
+            )}
+          </div>
+        )}
+        {fileCount !== null && status === 'done' && (
+          <span className="text-sm text-gray-600">
+            {fileCount} archivos incluidos en el paquete.
+          </span>
+        )}
+
+        {/* Historial (últimos 6) */}
+        {stats && stats.history.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" /> Historial de descargas (últimos {Math.min(6, stats.history.length)})
+            </p>
+            <div className="max-h-44 overflow-y-auto nice-scroll rounded-lg border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-2.5 py-1.5 text-left font-semibold text-gray-600">Versión</th>
+                    <th className="px-2.5 py-1.5 text-left font-semibold text-gray-600">Fecha</th>
+                    <th className="px-2.5 py-1.5 text-right font-semibold text-gray-600">Archivos</th>
+                    <th className="px-2.5 py-1.5 text-right font-semibold text-gray-600">Tamaño</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.history.slice(0, 6).map((h, idx) => (
+                    <tr key={`${h.version}-${h.fecha}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                      <td className="px-2.5 py-1.5 font-mono font-bold text-purple-800">V{h.version}</td>
+                      <td className="px-2.5 py-1.5 text-gray-600 whitespace-nowrap">{fmtDate(h.fecha)}</td>
+                      <td className="px-2.5 py-1.5 text-right text-gray-600">{h.archivos}</td>
+                      <td className="px-2.5 py-1.5 text-right text-gray-600">{fmtBytes(h.bytesZip)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              El botón «Verificar» usa dryRun y no aparece aquí (no consume versiones) — solo las descargas reales.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -10187,12 +11008,16 @@ export function AdminPanel() {
     switch (adminTab) {
       case 'dashboard': return <DashboardTab />;
       case 'products': return <ProductsTab />;
+      // V52.8 — catálogo de Servicios para Eventos como sección propia
+      case 'services': return <ServicesTab />;
+      // V52.9 — Galería de Eventos como sección propia (CRUD de categorías + fotos)
+      case 'gallery': return <GalleryTab />;
       case 'orders': return <OrdersTab />;
       case 'delivery': return <DeliveryTab />;
       case 'customers': return <CustomersTab />;
       case 'reviews': return <ReviewsTab />;
       case 'reservations': return <EventReservationsTab />;
-      case 'settings': return <SettingsTab />;
+      case 'settings': return <SettingsTab onNavigate={setAdminTab} />;
       case 'profile': return <ProfileTab />;
       default: return <DashboardTab />;
     }

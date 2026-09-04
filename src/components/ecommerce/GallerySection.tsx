@@ -17,7 +17,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Images, Expand, X, ChevronLeft, ChevronRight, Camera, ArrowLeft } from 'lucide-react';
+import { Images, Expand, X, ChevronLeft, ChevronRight, Camera, ArrowLeft, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface GalleryPhoto {
@@ -43,11 +43,17 @@ export function GallerySection() {
   const [openCat, setOpenCat] = useState<GalleryCategory | null>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [zoom, setZoom] = useState(false);
+  const [whatsapp, setWhatsapp] = useState<string>('');
 
   useEffect(() => {
     fetch('/api/gallery')
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setCategories(data); })
+      .catch(() => {});
+    // WhatsApp para compartir fotos del lightbox (V52.4)
+    fetch('/api/siteconfig')
+      .then((r) => r.json())
+      .then((cfg) => { if (cfg?.whatsappNumber) setWhatsapp(String(cfg.whatsappNumber)); })
       .catch(() => {});
   }, []);
 
@@ -363,6 +369,21 @@ export function GallerySection() {
             >
               <X className="h-6 w-6" />
             </button>
+
+            {/* Compartir foto por WhatsApp (V52.4) */}
+            {whatsapp && (
+              <a
+                href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Mira este trabajo de Dulce Encanto 🧁${current.title ? ` — ${current.title}` : ''}${openCat ? ` (${openCat.name})` : ''} ✨`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute top-4 left-4 z-10 inline-flex items-center gap-2 px-4 h-11 rounded-full text-xs font-bold text-white transition-all hover:scale-105 active:scale-95"
+                style={{ background: 'rgba(37,211,102,0.25)', border: '1.5px solid rgba(37,211,102,0.55)', backdropFilter: 'blur(6px)' }}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Compartir esta foto por WhatsApp"
+              >
+                <Share2 className="h-4 w-4" /> Compartir
+              </a>
+            )}
 
             {/* Flechas gigantes */}
             {photos.length > 1 && (

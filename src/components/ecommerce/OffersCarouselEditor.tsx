@@ -242,7 +242,7 @@ export function OffersCarouselEditor({ value, onChange }: OffersCarouselEditorPr
 
             {/* Buscador de productos */}
             {showProductPicker && (
-              <div className="border border-gray-200 rounded-lg p-2 space-y-2 max-h-80 overflow-y-auto">
+              <div className="border border-gray-200 rounded-lg p-2 space-y-2 max-h-80 overflow-y-auto nice-scroll">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                   <Input

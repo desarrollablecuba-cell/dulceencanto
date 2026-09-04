@@ -64,6 +64,14 @@ model Product {
   posAvailable  Boolean @default(true)
   tiendaAvailable Boolean @default(true)
 
+  // V52.6 — Disponibilidad por canal de venta (editable en el admin):
+  //  - directSaleEnabled: aparece en la sección Venta Directa (se paga en CUP).
+  //  - buffetEnabled: aparece en el grupo "Buffet para Repartir" de Reservas.
+  // V52.8 — El buffet se vende POR DOCENA en USD: buffetPriceUsd (30 USD).
+  directSaleEnabled Boolean @default(true)
+  buffetEnabled      Boolean @default(false)
+  buffetPriceUsd     Float   @default(30)
+
   // Anticipo
   advanceType   String  @default("sin")
   advanceValue  Float   @default(0)
@@ -388,14 +396,16 @@ model SiteConfig {
 model Service {
   id          String  @id @default(cuid())
   name        String
-  description String
+  description String  @db.LongText
   icon        String  @default("")
-  image       String  @default("")
+  image       String  @db.LongText @default("")
   price       Float   @default(0)
   priceUsd    Float   @default(0)
   category    String  @default("")
   active      Boolean @default(true)
   order       Int     @default(0)
+  // V52.5 — Variantes del servicio (JSON string): [{id,name,image,priceUsd,active,order}]
+  variants    String  @db.LongText @default("[]")
   createdAt   String  @default("")
   updatedAt   String  @default("")
 }
@@ -418,6 +428,8 @@ model EventReservation {
   status          String  @default("pending")
   totalCup        Float   @default(0)
   totalUsd        Float   @default(0)
+  // V52.7 — antelación máxima requerida por los items de la reserva (días)
+  leadDays        Int     @default(0)
   createdAt       String  @default("")
   updatedAt       String  @default("")
 
@@ -433,7 +445,9 @@ model EventReservationItem {
   quantity      Int     @default(1)
   priceCup      Float   @default(0)
   priceUsd      Float   @default(0)
-  notes         String  @default("")
+  notes         String  @db.LongText @default("")
+  // V52.7 — miniatura del servicio/producto/variante al momento de reservar
+  image         String  @db.LongText @default("")
 
   reservation EventReservation @relation(fields: [reservationId], references: [id])
 }

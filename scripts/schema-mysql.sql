@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS `Product` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'active',
     `posAvailable` BOOLEAN NOT NULL DEFAULT true,
     `tiendaAvailable` BOOLEAN NOT NULL DEFAULT true,
+    `directSaleEnabled` BOOLEAN NOT NULL DEFAULT true,
+    `buffetEnabled` BOOLEAN NOT NULL DEFAULT false,
+    `buffetPriceUsd` DOUBLE NOT NULL DEFAULT 30,
     `advanceType` VARCHAR(191) NOT NULL DEFAULT 'sin',
     `advanceValue` DOUBLE NOT NULL DEFAULT 0,
     `minHours` INTEGER NOT NULL DEFAULT 24,
@@ -352,14 +355,15 @@ CREATE TABLE IF NOT EXISTS `SiteConfig` (
 CREATE TABLE IF NOT EXISTS `Service` (
     `id` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
-    `description` VARCHAR(191) NOT NULL,
+    `description` LONGTEXT NOT NULL,
     `icon` VARCHAR(191) NOT NULL DEFAULT '',
-    `image` VARCHAR(191) NOT NULL DEFAULT '',
+    `image` LONGTEXT NOT NULL,
     `price` DOUBLE NOT NULL DEFAULT 0,
     `priceUsd` DOUBLE NOT NULL DEFAULT 0,
     `category` VARCHAR(191) NOT NULL DEFAULT '',
     `active` BOOLEAN NOT NULL DEFAULT true,
     `order` INTEGER NOT NULL DEFAULT 0,
+    `variants` LONGTEXT NOT NULL DEFAULT ('[]'),
     `createdAt` VARCHAR(191) NOT NULL DEFAULT '',
     `updatedAt` VARCHAR(191) NOT NULL DEFAULT '',
 
@@ -383,6 +387,7 @@ CREATE TABLE IF NOT EXISTS `EventReservation` (
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
     `totalCup` DOUBLE NOT NULL DEFAULT 0,
     `totalUsd` DOUBLE NOT NULL DEFAULT 0,
+    `leadDays` INTEGER NOT NULL DEFAULT 0,
     `createdAt` VARCHAR(191) NOT NULL DEFAULT '',
     `updatedAt` VARCHAR(191) NOT NULL DEFAULT '',
 
@@ -399,7 +404,8 @@ CREATE TABLE IF NOT EXISTS `EventReservationItem` (
     `quantity` INTEGER NOT NULL DEFAULT 1,
     `priceCup` DOUBLE NOT NULL DEFAULT 0,
     `priceUsd` DOUBLE NOT NULL DEFAULT 0,
-    `notes` VARCHAR(191) NOT NULL DEFAULT '',
+    `notes` LONGTEXT NOT NULL DEFAULT (''),
+    `image` LONGTEXT NOT NULL DEFAULT (''),
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

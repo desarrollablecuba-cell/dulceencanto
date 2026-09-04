@@ -36,13 +36,13 @@ const services = [
     id: 'srv-munecos', name: 'Muñecos Sorpresa',
     description: 'Muñecos sorpresa de personajes infantiles y de moda — payasitas humanas, personajes y animación. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.',
     icon: '🧸', category: 'entretenimiento', price: 2500, order: 1,
-    image: '/services/srv-munecos.webp',
+    image: '/services/srv-munecos-real.webp',
   },
   {
     id: 'srv-canon', name: 'Cañón de Confeti',
     description: 'Cañones de confeti para el momento culminante: la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.',
     icon: '🎉', category: 'entretenimiento', price: 1200, order: 2,
-    image: '/services/srv-canon.webp',
+    image: '/services/srv-canon-real.webp',
   },
   {
     id: 'srv-burbujas', name: 'Máquina de Burbujas',
@@ -60,7 +60,7 @@ const services = [
     id: 'srv-vela-volcanica', name: 'Vela Volcánica',
     description: 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.',
     icon: '🌋', category: 'entretenimiento', price: 800, order: 5,
-    image: '/services/srv-vela-volcanica.webp',
+    image: '/services/srv-vela-real.webp',
   },
   {
     id: 'srv-globos', name: 'Decoración con Globos',
@@ -72,13 +72,13 @@ const services = [
     id: 'srv-sublimacion', name: 'Sublimación de Pullovers',
     description: 'Pullovers personalizados con el nombre, foto o temática del evento — sublimación real de alta calidad. Recuerdos únicos para los invitados.',
     icon: '👕', category: 'personalizado', price: 1200, order: 7,
-    image: '/services/srv-sublimacion.webp',
+    image: '/services/srv-sublimacion-real.webp',
   },
   {
     id: 'srv-jarras', name: 'Jarras Personalizadas',
     description: 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.',
     icon: '🫗', category: 'personalizado', price: 1500, order: 8,
-    image: '/services/srv-jarras.webp',
+    image: '/services/srv-jarras-real.webp',
   },
   {
     id: 'srv-gigantografias', name: 'Gigantografías',
@@ -172,6 +172,25 @@ async function main() {
         actualizados++;
       }
     }
+    // V52.5 — variantes demo del Muñeco Sorpresa (solo si no tiene variantes)
+    try {
+      const munecos = await prisma.service.findUnique({ where: { id: 'srv-munecos' }, select: { variants: true } });
+      const sinVariantes = !munecos || !munecos.variants || munecos.variants.trim() === '' || munecos.variants.trim() === '[]';
+      if (sinVariantes) {
+        await prisma.service.update({
+          where: { id: 'srv-munecos' },
+          data: {
+            variants: JSON.stringify([
+              { id: 'var-payasita', name: 'Payasita', image: '/services/srv-munecos-real.webp', priceUsd: 0, active: true, order: 0 },
+              { id: 'var-conejo-chispa', name: 'Conejo Chispa', image: '/services/srv-vari-conejo-chispa.webp', priceUsd: 0, active: true, order: 1 },
+              { id: 'var-coneja-maricusa', name: 'Coneja Maricusa', image: '/services/srv-vari-coneja-maricusa.webp', priceUsd: 0, active: true, order: 2 },
+            ]),
+            updatedAt: now,
+          },
+        });
+        console.log('  🎭 Variantes demo del Muñeco Sorpresa sembradas (Payasita, Conejo Chispa, Coneja Maricusa).');
+      }
+    } catch { /* sin srv-munecos → seguir */ }
     console.log(`  ⏭️  La BD ya contiene ${existingServices} servicios. Seed omitido.`);
     console.log(`  🖼️  Fotos de servicios aplicadas: ${actualizados} (solo vacías).`);
     console.log('  ⏭️  Para forzar la resiembra: FORCE_SEED=1\n');

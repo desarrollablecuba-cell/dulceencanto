@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useCartStore } from '@/store/cart-store';
 import { useAppStore } from '@/store/app-store';
-import { useCurrencyStore, formatPrice } from '@/store/currency-store';
+import { formatPrice } from '@/store/currency-store';
+import { cartCurrency } from '@/store/cart-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -92,7 +93,8 @@ function formatDateSpanish(dateStr: string): string {
 
 export function CheckoutForm() {
   const items = useCartStore((s) => s.items);
-  const currency = useCurrencyStore((s) => s.currency);
+  // V52.7 — moneda del carrito según el modo: reservables → USD, venta directa → CUP.
+  const cartCur = cartCurrency(items);
   const getTotal = useCartStore((s) => s.getTotal);
   const clearCart = useCartStore((s) => s.clearCart);
   const setView = useAppStore((s) => s.setView);
@@ -987,7 +989,7 @@ export function CheckoutForm() {
           }
         } catch { /* ignore parse error */ }
       }
-      line += ` x${i.quantity} = ${formatPrice(i.price * i.quantity, currency)}`;
+      line += ` x${i.quantity} = ${formatPrice(i.price * i.quantity, cartCur)}`;
       return line;
     }).join('\n');
     // Totales del vale: CUP es la moneda de operación local y USD la referencia
@@ -1350,7 +1352,7 @@ export function CheckoutForm() {
                         </Badge>
                       ) : (
                         <span className="text-[11px] text-gray-500">
-                          Envío gratis desde <span className="font-semibold text-brand-dark">{formatPrice(freeShippingMin, currency)}</span>
+                          Envío gratis desde <span className="font-semibold text-brand-dark">{formatPrice(freeShippingMin, cartCur)}</span>
                         </span>
                       )}
                     </div>
@@ -1384,7 +1386,7 @@ export function CheckoutForm() {
                                 <>
                                   {' · '}
                                   <span className="font-medium text-brand-dark">
-                                    Envío: {formatPrice(Number(selectedZone.price), currency)}
+                                    Envío: {formatPrice(Number(selectedZone.price), cartCur)}
                                   </span>
                                 </>
                               )}
@@ -1510,7 +1512,7 @@ export function CheckoutForm() {
                             {freeShipping ? (
                               <span className="text-green-600 font-medium">GRATIS</span>
                             ) : (
-                              <span>{formatPrice(shippingCost, currency)}</span>
+                              <span>{formatPrice(shippingCost, cartCur)}</span>
                             )}
                           </p>
                         </div>
@@ -1543,7 +1545,7 @@ export function CheckoutForm() {
                                 Entrega Prioritaria
                               </p>
                               <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${hasReservableItemsInCart && !isNearTermDelivery ? 'bg-green-100 text-green-700' : 'bg-brand-light text-brand-dark'}`}>
-                                {hasReservableItemsInCart && !isNearTermDelivery ? 'GRATIS' : `+${formatPrice(asapSurchargePreview, currency)}`}
+                                {hasReservableItemsInCart && !isNearTermDelivery ? 'GRATIS' : `+${formatPrice(asapSurchargePreview, cartCur)}`}
                               </span>
                             </div>
                             <p className="text-xs text-gray-700 mt-1 font-medium">
@@ -1560,7 +1562,7 @@ export function CheckoutForm() {
                                 <span className="font-medium text-green-700">Recargo: GRATIS (producto reservable, entrega lejana)</span>
                               ) : (
                                 <>
-                                  <span className="font-medium">Recargo:</span> {formatPrice(asapSurchargePreview, currency)}{' '}
+                                  <span className="font-medium">Recargo:</span> {formatPrice(asapSurchargePreview, cartCur)}{' '}
                                   <span className="text-gray-400">
                                     ({(() => {
                                       let type = 'fixed';
@@ -1637,10 +1639,10 @@ export function CheckoutForm() {
                   {!meetsMinOrder && (
                     <div className="w-full rounded-lg bg-amber-50 border border-amber-200 p-3 text-center mb-3">
                       <p className="text-sm font-semibold text-amber-800">
-                        🛒 El monto mínimo de pedido es {formatPrice(minOrderAmount, currency)}
+                        🛒 El monto mínimo de pedido es {formatPrice(minOrderAmount, cartCur)}
                       </p>
                       <p className="text-xs text-amber-700 mt-0.5">
-                        Agrega más productos para continuar. Tu carrito actual es {formatPrice(total, currency)}
+                        Agrega más productos para continuar. Tu carrito actual es {formatPrice(total, cartCur)}
                       </p>
                     </div>
                   )}
@@ -1656,12 +1658,12 @@ export function CheckoutForm() {
                       </>
                     ) : !meetsMinOrder ? (
                       <>
-                        🛒 Falta {formatPrice(minOrderAmount - total, currency)} para el mínimo
+                        🛒 Falta {formatPrice(minOrderAmount - total, cartCur)} para el mínimo
                       </>
                     ) : samePerson ? (
                       <>
                         <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Confirmar Pedido — {formatPrice(finalTotal, currency)}
+                        Confirmar Pedido — {formatPrice(finalTotal, cartCur)}
                       </>
                     ) : (
                       <>
@@ -1776,10 +1778,10 @@ export function CheckoutForm() {
                   {!meetsMinOrder && (
                     <div className="w-full rounded-lg bg-amber-50 border border-amber-200 p-3 text-center mb-3">
                       <p className="text-sm font-semibold text-amber-800">
-                        🛒 El monto mínimo de pedido es {formatPrice(minOrderAmount, currency)}
+                        🛒 El monto mínimo de pedido es {formatPrice(minOrderAmount, cartCur)}
                       </p>
                       <p className="text-xs text-amber-700 mt-0.5">
-                        Agrega más productos para continuar. Tu carrito actual es {formatPrice(total, currency)}
+                        Agrega más productos para continuar. Tu carrito actual es {formatPrice(total, cartCur)}
                       </p>
                     </div>
                   )}
@@ -1796,7 +1798,7 @@ export function CheckoutForm() {
                     ) : (
                       <>
                         <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Confirmar Pedido — {formatPrice(finalTotal, currency)}
+                        Confirmar Pedido — {formatPrice(finalTotal, cartCur)}
                       </>
                     )}
                   </Button>
@@ -1824,7 +1826,7 @@ export function CheckoutForm() {
                       <span className="inline-block text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded mt-0.5">📅 RESERVADO</span>
                     )}
                     <p className="text-xs text-gray-500">Cant: {item.quantity}</p>
-                    <p className="text-sm font-bold text-gray-900">{formatPrice(item.price * item.quantity, currency)}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatPrice(item.price * item.quantity, cartCur)}</p>
                   </div>
                 </div>
               ))}
@@ -1832,14 +1834,14 @@ export function CheckoutForm() {
               <div className="space-y-2 min-w-0">
                 <div className="flex justify-between text-sm gap-2">
                   <span className="text-gray-600 min-w-0 truncate">Subtotal</span>
-                  <span className="shrink-0">{formatPrice(total, currency)}</span>
+                  <span className="shrink-0">{formatPrice(total, cartCur)}</span>
                 </div>
                 <div className="flex justify-between text-sm gap-2">
                   <span className="text-gray-600 min-w-0 truncate">
                     Envío{selectedZone ? ` · ${selectedZone.name}` : ''}
                   </span>
                   <span className={`shrink-0 ${freeShipping ? 'text-green-600 font-medium' : ''}`}>
-                    {freeShipping ? 'GRATIS' : formatPrice(shippingCost, currency)}
+                    {freeShipping ? 'GRATIS' : formatPrice(shippingCost, cartCur)}
                   </span>
                 </div>
                 {asapSurcharge > 0 && (
@@ -1848,14 +1850,14 @@ export function CheckoutForm() {
                       Costo de Entrega Prioritaria <span className="text-brand-dark">⚡ ASAP</span>
                     </span>
                     <span className="text-brand-dark font-medium shrink-0">
-                      +{formatPrice(asapSurcharge, currency)}
+                      +{formatPrice(asapSurcharge, cartCur)}
                     </span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between text-base font-bold gap-2">
                   <span className="min-w-0">Total</span>
-                  <span className="text-brand-dark shrink-0">{formatPrice(finalTotal, currency)}</span>
+                  <span className="text-brand-dark shrink-0">{formatPrice(finalTotal, cartCur)}</span>
                 </div>
               </div>
               {step === 'sender' && formData.recipientName && (

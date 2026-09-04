@@ -129,8 +129,14 @@ export function isDirectSaleProduct(p?: SaleProductLike | null): boolean {
 
 /**
  * Moneda en la que debe MOSTRARSE un producto concreto.
- * Venta directa → siempre CUP. El resto → la moneda global del toggle.
+ * V52.8 (petición del negocio): venta directa → SIEMPRE CUP;
+ * reservables (tortas, pasteles, dulces finos, buffet) → SIEMPRE USD,
+ * sin importar el toggle global. El toggle queda solo para referencias
+ * informativas (tasas de cambio, etc.).
  */
-export function currencyForProduct(p: SaleProductLike | null | undefined, globalCurrency: Currency): Currency {
-  return isDirectSaleProduct(p) ? 'CUP' : globalCurrency;
+export function currencyForProduct(
+  _p: SaleProductLike | null | undefined,
+  _globalCurrency: Currency
+): Currency {
+  return isDirectSaleProduct(_p) ? 'CUP' : 'USD';
 }

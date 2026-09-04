@@ -14,6 +14,7 @@ import { CartSidebar } from '@/components/ecommerce/CartSidebar';
 import { EventReservationModal } from '@/components/ecommerce/EventReservationModal';
 import { VitrinaHome } from '@/components/ecommerce/VitrinaHome';
 import { SectionPage } from '@/components/ecommerce/SectionPage';
+import { ScrollToTop } from '@/components/ecommerce/ScrollToTop';
 import {
   HOME_SECTIONS,
   HOME_SECTION_COMPONENTS,
@@ -362,7 +363,7 @@ function AppContent() {
         );
       case 'reservations':
         return (
-          <SectionPage title="Reservas de Tartas y Pasteles" subtitle="Tortas, pasteles de dos y tres pisos, cakes de bandeja. Reserva con 48h de anticipación." icon="📅" bannerImage={banner('reservations', '/card-reservas.webp')}>
+          <SectionPage title="Reservas de Tartas y Pasteles" subtitle="Tortas, pasteles de dos y tres pisos, cakes de bandeja y el Buffet para Repartir. Reserva con 48h de anticipación." icon="📅" bannerImage={banner('reservations', '/card-reservas.webp')}>
             <CatalogView catalog="reservation" />
           </SectionPage>
         );
@@ -424,6 +425,8 @@ function AppContent() {
       {!hideFooter && <Footer />}
       {/* Dock de navegación móvil (Venta Directa, Reservas, Servicios…) */}
       <MobileNavDock />
+      {/* Botón flotante "volver arriba" (V52.3) */}
+      <ScrollToTop />
       <CartSidebar />
       <WishlistSidebar />
       {currentView !== 'checkout' && <AIAssistant />}

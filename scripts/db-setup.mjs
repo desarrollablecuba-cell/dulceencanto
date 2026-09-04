@@ -79,12 +79,36 @@ const COLUMNAS_CRITICAS = [
   ['SiteConfig', 'navSections', "ALTER TABLE `SiteConfig` ADD COLUMN `navSections` LONGTEXT NOT NULL DEFAULT ('')"],
   ['SiteConfig', 'hamburgerItems', "ALTER TABLE `SiteConfig` ADD COLUMN `hamburgerItems` LONGTEXT NOT NULL DEFAULT ('')"],
   ['SiteConfig', 'howItWorksSteps', "ALTER TABLE `SiteConfig` ADD COLUMN `howItWorksSteps` LONGTEXT NOT NULL DEFAULT ('')"],
+  // V52.5 — variantes de servicios (JSON: [{id,name,image,priceUsd,active,order}])
+  ['Service', 'variants', "ALTER TABLE `Service` ADD COLUMN `variants` LONGTEXT NOT NULL DEFAULT ('[]')"],
+  // V52.6 — canales de venta del producto: Venta Directa + Buffet para Repartir
+  ['Product', 'directSaleEnabled', "ALTER TABLE `Product` ADD COLUMN `directSaleEnabled` BOOLEAN NOT NULL DEFAULT true"],
+  ['Product', 'buffetEnabled', "ALTER TABLE `Product` ADD COLUMN `buffetEnabled` BOOLEAN NOT NULL DEFAULT false"],
+  // V52.8 — el Buffet para Repartir se vende POR DOCENA en USD (como los dulces
+  // finos): buffetPriceUsd guarda el precio de la docena. DEFAULT 30 → al añadir
+  // la columna, TODOS los buffet existentes quedan a 30 USD la docena (lo que
+  // pidió el negocio); luego se edita por producto desde el admin.
+  ['Product', 'buffetPriceUsd', "ALTER TABLE `Product` ADD COLUMN `buffetPriceUsd` DOUBLE NOT NULL DEFAULT 30"],
+  // V52.7 — reservas de eventos: antelación máxima y miniaturas por item
+  ['EventReservation', 'leadDays', "ALTER TABLE `EventReservation` ADD COLUMN `leadDays` INTEGER NOT NULL DEFAULT 0"],
+  ['EventReservationItem', 'image', "ALTER TABLE `EventReservationItem` ADD COLUMN `image` LONGTEXT NOT NULL DEFAULT ('')"],
+];
+
+// V52.5 — columnas que deben ser LONGTEXT pero pudieron nacer como VARCHAR(191)
+// en deploys antiguos (las descripciones del admin y las fotos de servicios
+// pueden superar los 191 caracteres y se TRUNCABAN silenciosamente).
+const COLUMNAS_LONGTEXT = [
+  ['Service', 'description', 'ALTER TABLE `Service` MODIFY COLUMN `description` LONGTEXT NOT NULL'],
+  ['Service', 'image', 'ALTER TABLE `Service` MODIFY COLUMN `image` LONGTEXT NOT NULL'],
+  ['GalleryPhoto', 'image', 'ALTER TABLE `GalleryPhoto` MODIFY COLUMN `image` LONGTEXT NOT NULL'],
+  ['GalleryCategory', 'cover', 'ALTER TABLE `GalleryCategory` MODIFY COLUMN `cover` LONGTEXT NOT NULL'],
 ];
 
 async function verificarColumnasCriticas() {
   const url = process.env.DATABASE_URL || '';
   const schemaName = url.split('?')[0].split('/').pop() || 'railway';
   let reparadas = 0;
+  const columnasAnadidas = [];
   for (const [table, col, alter] of COLUMNAS_CRITICAS) {
     try {
       const rows = await prisma.$queryRawUnsafe(
@@ -94,6 +118,7 @@ async function verificarColumnasCriticas() {
       if (Number(rows[0]?.n) === 0) {
         await prisma.$executeRawUnsafe(alter);
         console.log(`[ddl-fix] ✓ ${table}.${col} AÑADIDA (faltaba en la BD)`);
+        columnasAnadidas.push(`${table}.${col}`);
         reparadas++;
       }
     } catch (e) {
@@ -101,9 +126,87 @@ async function verificarColumnasCriticas() {
       throw e;
     }
   }
+  // V52.5 — asegurar que las columnas de texto largo NO sean VARCHAR(191)
+  for (const [table, col, alter] of COLUMNAS_LONGTEXT) {
+    try {
+      const rows = await prisma.$queryRawUnsafe(
+        'SELECT DATA_TYPE AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+        schemaName, table, col
+      );
+      const tipo = String(rows[0]?.t || '').toLowerCase();
+      if (tipo && tipo !== 'longtext' && tipo !== 'mediumtext' && tipo !== 'text') {
+        await prisma.$executeRawUnsafe(alter);
+        console.log(`[ddl-fix] ✓ ${table}.${col} → LONGTEXT (era ${tipo.toUpperCase()}, truncaba datos)`);
+        reparadas++;
+      }
+    } catch (e) {
+      console.error(`[ddl-fix] ✗ ${table}.${col} (longtext): ${String(e?.message || e).slice(0, 140)}`);
+      throw e;
+    }
+  }
+
   console.log(reparadas > 0
     ? `[ddl-fix] ✓ ${reparadas} columna(s) reparadas sobre la BD existente`
     : '[ddl-fix] • todas las columnas críticas ya presentes');
+  return columnasAnadidas;
+}
+
+// ─── 1d. MIGRACIÓN V52.7 — renombrar categoría «Dulces Finos y Buffet» ────
+// El negocio pidió que la categoría se llame SOLO «Buffet para Repartir»
+// (los dulces finos van en su categoría aparte). Se renombra una sola vez:
+// si el admin ya la renombró o la creó con el nombre nuevo, no se toca.
+async function migrarV527RenombrarCategoria() {
+  const vieja = await prisma.category.findFirst({ where: { name: 'Dulces Finos y Buffet' } });
+  if (!vieja) {
+    console.log('[v52.7] • la categoría ya no se llama «Dulces Finos y Buffet» (nada que renombrar)');
+    return;
+  }
+  const existente = await prisma.category.findFirst({ where: { name: 'Buffet para Repartir' } });
+  if (existente && existente.id !== vieja.id) {
+    console.log('[v52.7] • ya existe otra categoría «Buffet para Repartir» — no se renombra');
+    return;
+  }
+  await prisma.category.update({ where: { id: vieja.id }, data: { name: 'Buffet para Repartir' } });
+  console.log('[v52.7] ✓ categoría «Dulces Finos y Buffet» renombrada a «Buffet para Repartir»');
+}
+
+// ─── 1c. MIGRACIÓN V52.6 — canales de venta (Buffet para Repartir) ─────────
+// Cuando la columna Product.buffetEnabled se acaba de AÑADIR a una BD de
+// Railway ya existente (upgrade a V52.6), marcamos como disponibles en
+// "Buffet para Repartir" a los mismos productos que hoy se ven en Venta
+// Directa — que es lo que el negocio pidió: la nueva categoría de Reservas
+// nace con el catálogo completo de venta directa. Es UNA SOLA VEZ: si el
+// admin después desactiva el buffet de un producto, no se vuelve a tocar
+// (la columna ya existe y este bloque se omite).
+let columnasAnadidasV52 = [];
+async function migrarV526Canales() {
+  if (!columnasAnadidasV52.includes('Product.buffetEnabled')) {
+    console.log('[v52.6] • buffetEnabled ya existía — no se re-siembra (respeta cambios del admin)');
+    return;
+  }
+  const cats = await prisma.category.findMany({ select: { id: true, section: true } });
+  const immediateCats = cats.filter((c) => c.section === 'immediate').map((c) => c.id);
+  const neutralCats = cats
+    .filter((c) => c.section !== 'immediate' && c.section !== 'reservation')
+    .map((c) => c.id);
+  const enVentaDirecta = await prisma.product.findMany({
+    where: {
+      tiendaAvailable: true,
+      status: 'active',
+      OR: [
+        { categoryId: { in: immediateCats.length > 0 ? immediateCats : ['__none__'] } },
+        { categoryId: { in: neutralCats.length > 0 ? neutralCats : ['__none__'] }, reservationEnabled: false },
+      ],
+    },
+    select: { id: true },
+  });
+  if (enVentaDirecta.length > 0) {
+    await prisma.product.updateMany({
+      where: { id: { in: enVentaDirecta.map((p) => p.id) } },
+      data: { buffetEnabled: true },
+    });
+  }
+  console.log(`[v52.6] ✓ ${enVentaDirecta.length} productos de Venta Directa habilitados en "Buffet para Repartir"`);
 }
 
 // ─── 2. SEMILLA DULCE ENCANTO (identidad, zonas, admin, config) ─────────────
@@ -177,18 +280,24 @@ async function sembrarExtras() {
 
   const serviciosData = [
     ['srv-decoracion', 'Decoración del Evento', 'Decoración completa del salón: centros de mesa, guirnaldas, telas, iluminación temática y ambientación según la ocasión.', '🎨', 'decoracion', 5000, 0, '/services/srv-decoracion.webp'],
-    ['srv-munecos', 'Muñecos Sorpresa', 'Muñecos sorpresa de personajes infantiles y de moda — payasitas humanas, personajes y animación. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.', '🧸', 'entretenimiento', 2500, 1, '/services/srv-munecos.webp'],
-    ['srv-canon', 'Cañón de Confeti', 'Cañones de confeti para la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.', '🎉', 'entretenimiento', 1200, 2, '/services/srv-canon.webp'],
+    ['srv-munecos', 'Muñecos Sorpresa', 'Muñecos sorpresa de personajes infantiles y de moda — payasitas humanas, personajes y animación. Ideales para cumpleaños y revelaciones. Incluye disfraz completo.', '🧸', 'entretenimiento', 2500, 1, '/services/srv-munecos-real.webp'],
+    ['srv-canon', 'Cañón de Confeti', 'Cañones de confeti para la hora loca, el corte de la tarta o la coronación. Pack de 6 cañones.', '🎉', 'entretenimiento', 1200, 2, '/services/srv-canon-real.webp'],
     ['srv-burbujas', 'Máquina de Burbujas', 'Máquina profesional de burbujas continua durante 2 horas. Magia visual para fotos y momento de baile.', '🫧', 'entretenimiento', 1500, 3, '/services/srv-burbujas.webp'],
     ['srv-caja-regalo', 'Caja de Regalos Personalizada', 'Caja decorada a mano con productos a tu elección: tartas mini, galletas, cupcakes y detalles personalizados.', '🎁', 'decoracion', 1800, 4, '/services/srv-caja-regalo.webp'],
-    ['srv-vela-volcanica', 'Vela Volcánica', 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.', '🌋', 'entretenimiento', 800, 5, '/services/srv-vela-volcanica.webp'],
+    ['srv-vela-volcanica', 'Vela Volcánica', 'Vela volcánica especial para cumpleaños: al encenderla brota llama colorida y sorpresa. Momento mágico garantizado.', '🌋', 'entretenimiento', 800, 5, '/services/srv-vela-real.webp'],
     ['srv-globos', 'Decoración con Globos', 'Arcos, columnas y bouquets de globos con colores temáticos. Globos helados para un toque premium.', '🎈', 'decoracion', 2200, 6, '/services/srv-globos.webp'],
-    ['srv-sublimacion', 'Sublimación de Pullovers', 'Pullovers personalizados con el nombre, foto o temática del evento — sublimación real de alta calidad. Recuerdos únicos para los invitados.', '👕', 'personalizado', 1200, 7, '/services/srv-sublimacion.webp'],
-    ['srv-jarras', 'Jarras Personalizadas', 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.', '🫗', 'personalizado', 1500, 8, '/services/srv-jarras.webp'],
+    ['srv-sublimacion', 'Sublimación de Pullovers', 'Pullovers personalizados con el nombre, foto o temática del evento — sublimación real de alta calidad. Recuerdos únicos para los invitados.', '👕', 'personalizado', 1200, 7, '/services/srv-sublimacion-real.webp'],
+    ['srv-jarras', 'Jarras Personalizadas', 'Jarras de regalo con diseño personalizado: nombre del festejado, fecha y temática. Set de 6 unidades.', '🫗', 'personalizado', 1500, 8, '/services/srv-jarras-real.webp'],
     ['srv-gigantografias', 'Gigantografías', 'Impresión gran formato para fotos de cuerpo entero, fondos de escenario o banners. Hasta 2x3 metros.', '🖼️', 'decoracion', 2000, 9, '/services/srv-gigantografias.webp'],
   ];
+  // V52.5 — variantes demo del Muñeco Sorpresa (foto real de la payasita + conejos)
+  const VARIANTES_MUNECOS = JSON.stringify([
+    { id: 'var-payasita', name: 'Payasita', image: '/services/srv-munecos-real.webp', priceUsd: 0, active: true, order: 0 },
+    { id: 'var-conejo-chispa', name: 'Conejo Chispa', image: '/services/srv-vari-conejo-chispa.webp', priceUsd: 0, active: true, order: 1 },
+    { id: 'var-coneja-maricusa', name: 'Coneja Maricusa', image: '/services/srv-vari-coneja-maricusa.webp', priceUsd: 0, active: true, order: 2 },
+  ]);
   for (const [id, name, description, icon, category, price, order, image] of serviciosData) {
-    await prisma.service.create({ data: { id, name, description, icon, category, image: image || '', price, priceUsd: cupToUsd(price), active: true, order, createdAt: now, updatedAt: now } });
+    await prisma.service.create({ data: { id, name, description, icon, category, image: image || '', price, priceUsd: cupToUsd(price), active: true, order, variants: id === 'srv-munecos' ? VARIANTES_MUNECOS : '[]', createdAt: now, updatedAt: now } });
   }
 
   const anio = new Date().getFullYear();
@@ -239,7 +348,7 @@ async function sembrarCatalogo() {
     ['cat-cake-bandeja', 'Cake Tamaño Bandeja', 'cake-bandeja', '🥮', 1, 'ambas'],
     ['cat-pasteles-dos-pisos', 'Pasteles de Dos Pisos', 'pasteles-dos-pisos', '🥧', 2, 'ambas'],
     ['cat-pasteles-tres-pisos', 'Pasteles de Tres Pisos', 'pasteles-tres-pisos', '🎂', 3, 'ambas'],
-    ['cat-dulces-finos', 'Dulces Finos y Buffet', 'dulces-finos-buffet', '🧁', 5, 'immediate'],
+    ['cat-dulces-finos', 'Buffet para Repartir', 'dulces-finos-buffet', '🧁', 5, 'immediate'],
   ];
   for (const [id, name, slug, icon, order, section] of cats) {
     await prisma.category.create({ data: { id, name, slug, icon, image: '', active: true, order, section, createdAt: now, updatedAt: now } });
@@ -486,35 +595,59 @@ console.log('══════════════════════�
 // ─── V52: fotos de servicios + specialDates con combos (idempotente) ────────
 // Se aplica en CADA arranque sobre BDs existentes:
 //  1. Completa la imagen de los 10 servicios conocidos SOLO si está vacía
-//     (no pisa fotos subidas por el admin).
+//     o si todavía tiene la foto IA antigua (no pisa fotos subidas por el
+//     admin — las subidas propias contienen un sufijo -<ts> aleatorio).
 //  2. Si SiteConfig.specialDates está vacío/[], siembra las fechas con los
 //     combos demo (Día de las Madres, Día de los Padres). Si el admin ya
 //     configuró sus fechas, NO se toca nada.
+//  3. (V52.5) Siembra las variantes demo del Muñeco Sorpresa si el servicio
+//     no tiene variantes, y actualiza los precios CUP derivados del USD.
 async function sembrarV52Combos() {
-  // 1) Fotos de servicios
+  // 1) Fotos de servicios — V52.5: fotos REALES del negocio donde existen
   const imgs = {
-    'srv-decoracion': '/services/srv-decoracion.webp',
-    'srv-munecos': '/services/srv-munecos.webp',
-    'srv-canon': '/services/srv-canon.webp',
-    'srv-burbujas': '/services/srv-burbujas.webp',
-    'srv-caja-regalo': '/services/srv-caja-regalo.webp',
-    'srv-vela-volcanica': '/services/srv-vela-volcanica.webp',
-    'srv-globos': '/services/srv-globos.webp',
-    'srv-sublimacion': '/services/srv-sublimacion.webp',
-    'srv-jarras': '/services/srv-jarras.webp',
-    'srv-gigantografias': '/services/srv-gigantografias.webp',
+    'srv-decoracion': { nueva: '/services/srv-decoracion.webp', vieja: '/services/srv-decoracion.webp' },
+    'srv-munecos': { nueva: '/services/srv-munecos-real.webp', vieja: '/services/srv-munecos.webp' },
+    'srv-canon': { nueva: '/services/srv-canon-real.webp', vieja: '/services/srv-canon.webp' },
+    'srv-burbujas': { nueva: '/services/srv-burbujas.webp', vieja: '/services/srv-burbujas.webp' },
+    'srv-caja-regalo': { nueva: '/services/srv-caja-regalo.webp', vieja: '/services/srv-caja-regalo.webp' },
+    'srv-vela-volcanica': { nueva: '/services/srv-vela-real.webp', vieja: '/services/srv-vela-volcanica.webp' },
+    'srv-globos': { nueva: '/services/srv-globos.webp', vieja: '/services/srv-globos.webp' },
+    'srv-sublimacion': { nueva: '/services/srv-sublimacion-real.webp', vieja: '/services/srv-sublimacion.webp' },
+    'srv-jarras': { nueva: '/services/srv-jarras-real.webp', vieja: '/services/srv-jarras.webp' },
+    'srv-gigantografias': { nueva: '/services/srv-gigantografias.webp', vieja: '/services/srv-gigantografias.webp' },
   };
   let fotos = 0;
-  for (const [id, image] of Object.entries(imgs)) {
+  for (const [id, { nueva, vieja }] of Object.entries(imgs)) {
     try {
       const s = await prisma.service.findUnique({ where: { id }, select: { image: true } });
-      if (s && !s.image) {
-        await prisma.service.update({ where: { id }, data: { image, updatedAt: now } });
+      // Aplicar la foto real si está vacía O si aún tiene la foto IA antigua.
+      // Las fotos subidas por el admin (sufijo -<ts>) NUNCA se pisan.
+      if (s && (!s.image || s.image === vieja)) {
+        await prisma.service.update({ where: { id }, data: { image: nueva, updatedAt: now } });
         fotos++;
       }
     } catch { /* servicio inexistente → seguir */ }
   }
   if (fotos > 0) console.log(`[v52] ✓ ${fotos} servicios con foto protagonista aplicada`);
+
+  // 3) V52.5 — variantes demo del Muñeco Sorpresa (solo si no tiene variantes)
+  try {
+    const s = await prisma.service.findUnique({ where: { id: 'srv-munecos' }, select: { variants: true } });
+    const sinVariantes = !s || !s.variants || s.variants.trim() === '' || s.variants.trim() === '[]';
+    if (sinVariantes) {
+      const variantes = JSON.stringify([
+        { id: 'var-payasita', name: 'Payasita', image: '/services/srv-munecos-real.webp', priceUsd: 0, active: true, order: 0 },
+        { id: 'var-conejo-chispa', name: 'Conejo Chispa', image: '/services/srv-vari-conejo-chispa.webp', priceUsd: 0, active: true, order: 1 },
+        { id: 'var-coneja-maricusa', name: 'Coneja Maricusa', image: '/services/srv-vari-coneja-maricusa.webp', priceUsd: 0, active: true, order: 2 },
+      ]);
+      await prisma.service.update({ where: { id: 'srv-munecos' }, data: { variants: variantes, updatedAt: now } });
+      console.log('[v52.5] ✓ variantes demo del Muñeco Sorpresa sembradas (Payasita, Conejo Chispa, Coneja Maricusa)');
+    } else {
+      console.log('[v52.5] = variantes ya configuradas (no se tocan)');
+    }
+  } catch (e) {
+    console.log('[v52.5] ⚠️ variantes muñecos: ' + String(e?.message || e).slice(0, 120));
+  }
 
   // 2) specialDates con combos (solo si nunca se configuraron)
   try {
@@ -542,7 +675,9 @@ console.log('══════════════════════�
 //  de las secciones de la web aparecía vacía en Railway).
 const bloques = [
   ['tablas + columnas', crearTablas],
-  ['autorreparación columnas', verificarColumnasCriticas],
+  ['autorreparación columnas', async () => { columnasAnadidasV52 = await verificarColumnasCriticas(); }],
+  ['v52.6: canales buffet', migrarV526Canales],
+  ['v52.7: renombrar categoría buffet', migrarV527RenombrarCategoria],
   ['identidad (admin/zonas)', sembrarDulce],
   ['siteconfig (hero/banner/etc)', sembrarSiteConfig],
   ['servicios/promos/galería', sembrarExtras],

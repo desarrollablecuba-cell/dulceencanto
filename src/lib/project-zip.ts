@@ -59,8 +59,14 @@ const INCLUDE_PATHS = [
   'Caddyfile',
 ];
 
-/** Extensiones de imagen que se convierten a WebP. */
-const IMAGE_EXTENSIONS = ['.webp', '.webp', '.webp', '.webp'];
+/** Extensiones de imagen que se convierten a WebP.
+ *  IMPORTANTE: NUNCA incluir '.webp' aquí (sharp no puede usar el mismo
+ *  archivo como entrada y salida). Este array se corrompió en versiones
+ *  anteriores porque updateImageReferences reescribía sus propios literales
+ *  de código — el regex ahora exige un carácter de nombre de archivo antes
+ *  del punto, así que `'.png'` (literal de extensión) ya no coincide.
+ */
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif'];
 const WEBP_QUALITY = 80;
 
 /** Extensiones de texto donde se actualizan referencias de imagen. */
@@ -109,6 +115,26 @@ async function writeVersionState(st: VersionState): Promise<void> {
 
 // Serializa las descargas: cada una recibe SU número (V50, V51, …) sin carreras.
 let downloadLock: Promise<unknown> = Promise.resolve();
+
+/**
+ * Estadísticas de descargas para el panel admin (V52.3):
+ * próxima versión pendiente + historial de paquetes servidos.
+ * Solo lectura — no consume versiones ni toca el lock.
+ */
+export async function readDownloadStats(): Promise<{
+  pendingVersion: number;
+  totalDownloads: number;
+  lastDownloadAt: string | null;
+  history: { version: number; fecha: string; archivos: number; bytesZip: number }[];
+}> {
+  const st = await readVersionState();
+  return {
+    pendingVersion: st.next,
+    totalDownloads: st.historial.length,
+    lastDownloadAt: st.historial.length > 0 ? st.historial[0].fecha : null,
+    history: st.historial.slice(0, 12),
+  };
+}
 
 // ─── Writer ZIP puro en JavaScript (deflate) ────────────────────────────────
 
@@ -254,6 +280,7 @@ async function convertImagesToWebp(dir: string): Promise<number> {
 
     // Un .webp ya convertido nunca debe tocarse (evita sobrescribirse a sí mismo)
     const webpPath = fullPath.slice(0, -ext.length) + '.webp';
+    if (webpPath === fullPath) continue; // defensa extra
     try {
       await sharp(fullPath).webp({ quality: WEBP_QUALITY }).toFile(webpPath);
       if (webpPath !== fullPath) await fs.unlink(fullPath);
@@ -266,7 +293,16 @@ async function convertImagesToWebp(dir: string): Promise<number> {
   return converted;
 }
 
-/** Actualiza referencias .png/.jpg/.jpeg/.gif → .webp en archivos de texto. */
+/** Actualiza referencias de imagen .png/.jpg/.jpeg/.gif → .webp en archivos de texto.
+ *
+ *  ⚠️ REGEX BLINDADO: exige un carácter de nombre de archivo ANTES del punto
+ *  (y usa \x60 para el backtick), de modo que los literales de extensión del
+ *  propio código (como '.png' dentro de IMAGE_EXTENSIONS) NUNCA se
+ *  reescriban. En versiones anteriores el regex aceptaba el punto en
+ *  cualquier posición, coincidía con el literal de extensión y corrompía
+ *  este mismo archivo al empaquetarlo (IMAGE_EXTENSIONS terminó lleno de
+ *  '.webp' en los ZIP V51/V52, matando la conversión PNG/JPG→WebP).
+ */
 async function updateImageReferences(dir: string): Promise<number> {
   let updated = 0;
   let entries;
@@ -284,12 +320,21 @@ async function updateImageReferences(dir: string): Promise<number> {
     }
     if (!entry.isFile()) continue;
 
+    // Nunca reescribir este archivo (autocorrupción histórica)
+    if (entry.name === 'project-zip.ts') continue;
+
     const ext = path.extname(entry.name).toLowerCase();
     if (!TEXT_EXTENSIONS.includes(ext)) continue;
 
     try {
       const content = await fs.readFile(fullPath, 'utf-8');
-      const next = content.replace(/\.(png|jpe?g|gif)(['"`)])/gi, '.webp$2');
+      // El grupo 1 exige un carácter de filename antes del punto: "foto.png'"
+      // sí coincide, pero el literal "'.png'" no (antes del punto hay una comilla).
+      // (\x60 = backtick: evita confusiones con template literals)
+      const next = content.replace(
+        /([A-Za-z0-9_\-\/])\.(png|jpe?g|gif)(['"\x60)])/gi,
+        '$1.webp$3'
+      );
       if (next !== content) {
         await fs.writeFile(fullPath, next, 'utf-8');
         updated++;
@@ -356,10 +401,100 @@ async function collectFiles(
 // vez de entregar un paquete viejo incompleto.
 
 const REQUIRED_LATEST: [string, RegExp?][] = [
+  // V52.9 — Editor de Servicios dos vistas (lista con preview + detalle) + Galería sección propia
+  ['src/components/ecommerce/admin/ServicesCatalog.tsx', /ServicesCatalog/],
+  ['src/components/ecommerce/admin/ServicesCatalog.tsx', /Vista en tienda/],
+  ['src/components/ecommerce/admin/GalleryTab.tsx', /GalleryTab/],
+  ['src/components/ecommerce/admin/GalleryTab.tsx', /Fotos de eventos reales/],
+  ['src/components/ecommerce/AdminPanel.tsx', /case 'gallery': return <GalleryTab \/>/],
+  ['src/components/ecommerce/AdminPanel.tsx', /goGallery/],
+  ['scripts/seed-gallery-v529.ts', /seed-gallery-v529|gal-15anos-1/],
+  ['public/gallery/gal-15anos-1.webp'],
+  ['public/gallery/gal-ninos-1.webp'],
+  ['public/gallery/gal-bodas-1.webp'],
+  // V52.8 — Moneda fija por canal (USD reservables / CUP directa) + buffet por docena
+  // + Servicios como sección propia del admin + reserva de eventos ampliada
+  ['src/store/currency-store.ts', /isDirectSaleProduct\(_p\)\s*\?\s*'CUP'\s*:\s*'USD'/],
+  ['src/components/ecommerce/CatalogView.tsx', /moneda fija por canal/],
+  ['src/components/ecommerce/CatalogView.tsx', /buffetPriceUsd/],
+  ['src/components/ecommerce/ProductDetail.tsx', /isBuffetMode/],
+  ['src/components/ecommerce/EventReservationModal.tsx', /buffetUsd/],
+  ['src/components/ecommerce/EventReservationModal.tsx', /Tu evento/],
+  ['src/components/ecommerce/AdminPanel.tsx', /function ServicesTab/],
+  ['src/components/ecommerce/AdminPanel.tsx', /buffetPriceUsd/],
+  ['src/components/ecommerce/AdminPanel.tsx', /formIsDirect/],
+  ['src/app/api/admin/products/route.ts', /buffetPriceUsd/],
+  ['src/app/api/admin/products/[id]/route.ts', /buffetPriceUsd/],
+  ['scripts/schema-mysql.sql', /`buffetPriceUsd` DOUBLE NOT NULL DEFAULT 30/],
+  ['scripts/db-setup.mjs', /buffetPriceUsd/],
+  ['src/components/ecommerce/AIAssistant.tsx', /bottom-\[88px\]/],
+  ['src/app/globals.css', /bottom: 152px/],
+  // V52.7 — Carrito USD + no mezclar canales + admin stock + reservas con antelación + tickets
+  ['src/store/cart-store.ts', /saleMode/],
+  ['src/store/cart-store.ts', /cartCurrency/],
+  ['src/components/ecommerce/CartSidebar.tsx', /Pedido RESERVABLE/],
+  ['src/components/ecommerce/CheckoutForm.tsx', /cartCurrency/],
+  ['src/components/ecommerce/ProductDetail.tsx', /productSaleMode/],
+  ['src/components/ecommerce/CatalogView.tsx', /saleMode/],
+  ['src/components/ecommerce/AdminPanel.tsx', /Venta Directa — Control de Stock/],
+  ['src/components/ecommerce/AdminPanel.tsx', /saveStock/],
+  ['src/components/ecommerce/EventReservationModal.tsx', /maxLeadDays/],
+  ['src/components/ecommerce/EventReservationModal.tsx', /ProductPickerGrid/],
+  ['src/app/api/event-reservations/route.ts', /maxLeadDaysFor/],
+  ['src/app/api/event-reservations/[id]/route.ts', /PATCH/],
+  ['src/components/ecommerce/admin/EventReservationsTab.tsx', /printTicket/],
+  ['src/components/ecommerce/admin/EventReservationsTab.tsx', /Ticket80mm/],
+  ['src/components/ecommerce/admin/EventReservationsTab.tsx', /TicketCarta/],
+  ['scripts/db-setup.mjs', /migrarV527RenombrarCategoria/],
+  ['scripts/schema-mysql.sql', /`leadDays` INTEGER NOT NULL DEFAULT 0/],
+  ['scripts/schema-mysql.sql', /EventReservationItem[\s\S]*`image` LONGTEXT/],
+  // V52.6 — Buffet para Repartir (canales de venta por producto) + Por Docena
+  ['src/app/api/products/route.ts', /buffetEnabled/],
+  ['src/components/ecommerce/CatalogView.tsx', /Buffet para Repartir/],
+  ['src/components/ecommerce/CatalogView.tsx', /Por Docena/],
+  ['src/components/ecommerce/ProductCard.tsx', /Por Docena/],
+  ['src/components/ecommerce/ProductDetail.tsx', /Precio por docena/],
+  ['src/components/ecommerce/AdminPanel.tsx', /buffetEnabled/],
+  ['src/app/api/admin/products/route.ts', /directSaleEnabled/],
+  ['src/components/ecommerce/MobileNavDock.tsx', /SIEMPRE visible/],
+  ['src/components/ecommerce/Header.tsx', /Secciones de la tienda/],
+  ['scripts/db-setup.mjs', /migrarV526Canales/],
+  ['scripts/schema-mysql.sql', /`buffetEnabled` BOOLEAN NOT NULL DEFAULT false/],
+  // V52.5 — Compresión de imágenes EN EL CLIENTE (fix del 502 con fotos 8MB+)
+  ['src/lib/compress-image.ts', /compressImageFile/],
+  ['src/lib/image-upload.ts', /compressImageFile/],
+  ['src/components/ecommerce/SectionManagers.tsx', /compressImageFile/],
+  // V52.5 — Variantes de servicios (schema + lib + admin + tienda + reservas)
+  ['src/lib/service-variants.ts', /parseServiceVariants/],
+  ['src/app/api/services/route.ts', /parseServiceVariants/],
+  ['src/app/api/admin/services/route.ts', /serializeServiceVariants/],
+  ['src/components/ecommerce/ServicesSection.tsx', /selVariantId/],
+  ['src/components/ecommerce/EventReservationModal.tsx', /selectedVariants/],
+  ['public/services/srv-munecos-real.webp'],
+  ['public/services/srv-canon-real.webp'],
+  ['public/services/srv-vela-real.webp'],
+  ['public/services/srv-sublimacion-real.webp'],
+  ['public/services/srv-jarras-real.webp'],
+  ['public/services/srv-vari-conejo-chispa.webp'],
+  ['public/services/srv-vari-coneja-maricusa.webp'],
+  // V52.5 — PWA prompt solo en móvil
+  ['src/components/ecommerce/PWAInstallPrompt.tsx', /isMobileDevice/],
+  // V52.4 — Rutas de subida de imágenes RECONSTRUIDAS (se perdieron del V51):
+  // helper compartido con sharp → WebP + espejo standalone para Railway
+  ['src/lib/admin-upload.ts', /handleAdminImageUpload/],
+  ['src/app/api/admin/products/upload/route.ts', /handleAdminImageUpload/],
+  ['src/app/api/admin/categories/upload/route.ts', /handleAdminImageUpload/],
+  ['src/app/api/admin/gallery/upload/route.ts', /handleAdminImageUpload/],
+  ['src/app/api/admin/sections/upload/route.ts', /handleAdminImageUpload/],
+  ['src/app/api/admin/services/upload/route.ts', /handleAdminImageUpload/],
+  // V52.3 — Centro de descargas del admin (stats API + card del Dashboard)
+  ['src/app/api/admin/download/stats/route.ts', /readDownloadStats/],
+  // V52.3 — Botón flotante "volver arriba" + scrollbar elegante
+  ['src/components/ecommerce/ScrollToTop.tsx', /scroll-top-fab/],
+  ['src/app/globals.css', /\.nice-scroll/],
   // V52 — Servicios con foto protagonista (cards verticales)
   ['src/components/ecommerce/ServicesSection.tsx', /aspectRatio[^,]*3[^,]*4/],
   ['src/app/api/admin/services/route.ts'],
-  ['src/app/api/admin/services/upload/route.ts'],
   ['scripts/seed-extras.ts', /\/services\/srv-/],
   ['public/services/srv-sublimacion.webp'],
   ['public/services/srv-munecos.webp'],
@@ -371,18 +506,13 @@ const REQUIRED_LATEST: [string, RegExp?][] = [
   ['src/components/ecommerce/GallerySection.tsx'],
   ['src/app/api/admin/gallery/route.ts'],
   ['src/app/api/admin/gallery/photos/route.ts'],
-  ['src/app/api/admin/gallery/upload/route.ts'],
   ['scripts/seed-gallery.ts'],
   ['prisma/migrations/20260903000001_gallery_categories/migration.sql'],
   // Secciones con imagen configurable
-  ['src/app/api/admin/sections/upload/route.ts'],
   ['src/lib/section-images.ts'],
   // Dock móvil + fixes de consola
   ['src/components/ecommerce/MobileNavDock.tsx'],
   ['src/components/ServiceWorkerCleaner.tsx'],
-  // Subidas de imágenes (bug corregido)
-  ['src/app/api/admin/categories/upload/route.ts'],
-  ['src/app/api/admin/products/upload/route.ts'],
   // Diagnóstico Railway
   ['src/app/api/health/route.ts'],
   // Deploy
@@ -415,13 +545,19 @@ function verifyLatestCode(entries: ZipEntry[], versionNumber: number): string[] 
     }
   }
 
-  // El schema embebido debe ser el MySQL COMPLETO (galería v2 + secciones)
+  // El schema embebido debe ser el MySQL COMPLETO (galería v2 + secciones + variantes V52.5 + canales V52.6)
   const schema = map.get('prisma/schema.prisma')?.toString('utf-8') ?? '';
   const schemaChecks: [string, RegExp][] = [
     ['model GalleryCategory', /model\s+GalleryCategory\s*\{/],
     ['model GalleryPhoto', /model\s+GalleryPhoto\s*\{/],
     ['sectionImages (SiteConfig)', /sectionImages\s+String\s+@db\.LongText/],
     ['section (Category)', /section\s+String\s+@default\("ambas"\)/],
+    ['variants (Service V52.5)', /variants\s+String\s+@db\.LongText\s+@default\("\[\]"\)/],
+    ['buffetEnabled (Product V52.6)', /buffetEnabled\s+Boolean\s+@default\(false\)/],
+    ['directSaleEnabled (Product V52.6)', /directSaleEnabled\s+Boolean\s+@default\(true\)/],
+    ['buffetPriceUsd (Product V52.8)', /buffetPriceUsd\s+Float\s+@default\(30\)/],
+    ['leadDays (EventReservation V52.7)', /leadDays\s+Int\s+@default\(0\)/],
+    ['image (EventReservationItem V52.7)', /image\s+String\s+@db\.LongText\s+@default\(""\)/],
   ];
   for (const [label, re] of schemaChecks) {
     if (!re.test(schema)) problems.push(`prisma/schema.prisma sin ${label}`);
@@ -463,6 +599,10 @@ export interface CreateProjectZipOptions {
   manifest?: Record<string, unknown>;
   /** Prefijo del nombre sugerido del archivo. Default: dulce-encanto */
   filenamePrefix?: string;
+  /** Si es false, genera el paquete SIN consumir el número de versión
+   *  (para sondeos/QA: /api/download?dryRun=1). El ZIP usa el número que
+   *  tocaría, pero el contador no avanza ni se registra en el historial. */
+  consumeVersion?: boolean;
 }
 
 export interface ProjectZipSuccess extends ProjectZipResult {
@@ -500,6 +640,8 @@ async function buildProjectZip(
 
   try {
     await fs.mkdir(tmpDir, { recursive: true });
+
+    const consume = options.consumeVersion !== false; // default: true
 
     // 1. Copiar whitelist (código REAL del proyecto en este instante)
     let copied = 0;
@@ -585,13 +727,173 @@ async function buildProjectZip(
       '    ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).',
       '',
       'ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO (V52):',
+      ' - NUEVO (V52.9) ⭐ EDITOR DE SERVICIOS RENOVADO (dos vistas, como',
+      '   Productos): la sección “✨ Servicios” lista cada servicio en CARDS',
+      '   con su FOTO real + detalles principales (categoría, precio USD,',
+      '   variantes, estado, orden) y buscador con filtros por categoría.',
+      '   Al entrar en un servicio se abre el EDITOR DETALLADO a pantalla',
+      '   completa: pestañas Información / Variantes / «Vista en tienda»',
+      '   (previsualiza la card pública tal y como la ve el cliente), barra',
+      '   superior con Volver·Cancelar·Guardar y foto protagonista grande',
+      '   con subida comprimida (8MB sin error 502).',
+      ' - NUEVO (V52.9) ⭐ GALERÍA DE EVENTOS = SECCIÓN PROPIA DEL ADMIN:',
+      '   el menú lateral tiene “🖼️ Galería” al nivel de Productos/Servicios',
+      '   (antes estaba escondida en Ajustes → Secciones). Lista de',
+      '   categorías con portada + nº de fotos y, al entrar en una, editor',
+      '   completo: datos de la categoría (nombre, icono, descripción,',
+      '   portada, visibilidad) y gestor de FOTOS con agregar varias de',
+      '   golpe (con barra de progreso), EDITAR título y descripción,',
+      '   REEMPLAZAR la imagen, ocultar sin borrar, reordenar y eliminar.',
+      '   Incluye 12 fotos realistas de demo (fiestas de 15, cumpleaños',
+      '   infantiles, de adultos y bodas) sembradas con',
+      '   scripts/seed-gallery-v529.ts — bórralas desde el admin y sube las',
+      '   tuyas reales.',
+      ' - NUEVO (V52.8) ⭐ PRECIOS EN USD EN TODAS PARTES (excepto Venta',
+      '   Directa en CUP): los productos RESERVABLES se muestran SIEMPRE en',
+      '   $ USD (admin, catálogo, buscador, más vendidos y carrito), sin',
+      '   importar el toggle de moneda. En el ADMIN, el editor de productos',
+      '   carga/guarda el precio en la MONEDA DEL CANAL: los reservables se',
+      '   editan en USD (badge morado “📅 Por reserva: precios en $ USD” +',
+      '   conversión ≈ CUP en vivo) y los de venta directa en ₡ CUP (badge',
+      '   verde). Los pedidos del admin se muestran en ₡ CUP (como se',
+      '   guardan en BD). FIX: la flecha “volver arriba” ya NO se solapa con',
+      '   el botón de WhatsApp (quedaron apilados en ambos tamaños).',
+      ' - NUEVO (V52.8) ⭐ BUFFET PARA REPARTIR POR DOCENA: el buffet se',
+      '   vende POR DOCENA en $USD igual que los dulces finos. Precio por',
+      '   defecto: 30 USD la docena (columna buffetPriceUsd, se ajusta por',
+      '   producto en el admin → pestaña Disponibilidad → “Precio del',
+      '   Buffet — por docena”). En Reservas, la card y el detalle muestran',
+      '   $30.00/docena con la etiqueta 🍬 y el ítem entra al carrito como',
+      '   “— Docena”. La reserva de eventos también lo cotiza por docena.',
+      ' - NUEVO (V52.8) ⭐ SERVICIOS = SECCIÓN PROPIA DEL ADMIN: el menú',
+      '   lateral tiene “✨ Servicios” al nivel de Productos (antes estaba',
+      '   escondido en Ajustes → Secciones). Página con encabezado, chips',
+      '   informativos y el CRUD completo con variantes y fotos.',
+      ' - NUEVO (V52.8) ⭐ RESERVA DE EVENTOS RE-DISEÑADA: modal ENORME',
+      '   (max-w-6xl, casi pantalla completa) que APROVECHA las pantallas:',
+      '   en desktop, panel lateral “Tu evento” SIEMPRE visible con las',
+      '   miniaturas, cantidades, antelación y total en vivo; los SERVICIOS',
+      '   se eligen con su FOTO REAL en cards visuales (antes solo emoji);',
+      '   el buffet cotiza por docena; en móvil, mini-resumen en vivo en el',
+      '   pie. Flujo mucho más fácil para los clientes.',
+      ' - NUEVO (V52.7) ⭐ CARRITO EN USD (excepto Venta Directa en CUP): los',
+      '   productos RESERVABLES se muestran y venden en $ USD; los de VENTA',
+      '   DIRECTA siempre en ₡ CUP. El carrito muestra un banner del canal y',
+      '   NO permite mezclar venta directa con reservables en un mismo',
+      '   pedido (aviso claro al intentarlo, en todas las vías de compra).',
+      ' - NUEVO (V52.7) ⭐ ADMIN — CATEGORÍA “VENTA DIRECTA” CON CONTROL DE',
+      '   STOCK: en Productos hay un segmento 🛒 Venta Directa (stock ₡) que',
+      '   abre la tabla de stock con edición INLINE (−/+ e input, se guarda',
+      '   con Enter/al salir, feedback verde). El segmento 📅 Por Reserva',
+      '   muestra el catálogo reservable en cards con su antelación. El',
+      '   resto de las categorías son POR RESERVA por definición.',
+      ' - NUEVO (V52.7) La categoría “Dulces Finos y Buffet” se llama ahora',
+      '   SOLO “Buffet para Repartir” (los dulces finos van en su categoría',
+      '   aparte). La migración v52.7 la renombra una sola vez en Railway.',
+      ' - NUEVO (V52.7) ⭐ RESERVA DE EVENTOS COMPLETA: al reservar un evento',
+      '   el cliente elige TODOS los productos y servicios RESERVABLES',
+      '   (tortas, pasteles, cakes, dulces finos y el Buffet para Repartir)',
+      '   con buscador, chips por categoría y grid visual con fotos. La',
+      '   FECHA respeta la ANTELACIÓN: la más cercana disponible se calcula',
+      '   desde hoy + el MAYOR tiempo de antelación de los productos del',
+      '   pedido (ej: pastel de 2 pisos 7 días + dulces finos 2 días →',
+      '   mínimo 7 días). El servidor valida la antelación al recibir la',
+      '   reserva (error 400 si no cumple).',
+      ' - NUEVO (V52.7) ⭐ VISTA AMPLIADA DE EVENTOS EN EL CALENDARIO DEL',
+      '   ADMIN: el detalle muestra todos los productos y servicios con',
+      '   MINIATURAS de foto (de cada servicio, producto o su variante),',
+      '   datos completos, notas y totales en USD. El estado ahora SÍ se',
+      '   persiste (PATCH /api/event-reservations/:id: confirmar/completar/',
+      '   cancelar) y hay botón de escribir al cliente por WhatsApp.',
+      ' - NUEVO (V52.7) ⭐ TICKET IMPRIMIBLE DEL EVENTO en DOS formatos:',
+      '   🧾 80mm (impresora térmica de recibos) y 📄 Hoja Carta (detallada',
+      '   con miniaturas y firma). Botones dentro del detalle del evento.',
+      ' - NUEVO (V52.6) ⭐ ETIQUETA “POR DOCENA” EN LOS DULCES FINOS: las',
+      '   cards de los dulces finos muestran desde fuera la etiqueta',
+      '   “🍬 Por Docena” (sobre la foto + “/ docena” junto al precio y',
+      '   “Precio por docena (12 unidades)” en el detalle), para que quede',
+      '   claro que el precio es por la docena.',
+      ' - NUEVO (V52.6) ⭐ CATEGORÍA “BUFFET PARA REPARTIR” EN RESERVAS:',
+      '   dentro de Reservas aparece el grupo destacado “Buffet para',
+      '   Repartir” con LOS MISMOS PRODUCTOS de la Venta Directa (para',
+      '   repartir en eventos). Al editar un producto en el admin, la',
+      '   pestaña Disponibilidad tiene el selector “¿Dónde estará disponible',
+      '   este producto?” con casillas 🛒 Venta Directa y 🍽️ Buffet para',
+      '   Repartir. En BDs existentes la migración marca como buffet a los',
+      '   productos que hoy se ven en Venta Directa (una sola vez, nunca',
+      '   pisa cambios posteriores del admin).',
+      ' - NUEVO (V52.6) La BARRA FLOTANTE MÓVIL ahora es SIEMPRE VISIBLE',
+      '   (antes solo aparecía al final de la página): los clientes pueden',
+      '   saltar de inmediato a Inicio, Venta Directa, Reservas, Servicios,',
+      '   Promos o Galería desde cualquier punto. El MENÚ LATERAL (hamburguesa)',
+      '   también incluye ahora las mismas secciones de la barra flotante,',
+      '   agrupadas bajo “Secciones de la tienda” y con la sección activa',
+      '   resaltada.',
+      ' - NUEVO (V52.5) ⭐ VARIANTES DE SERVICIOS: cada servicio puede tener',
+      '   variantes con FOTO y nombre propios (ej: Muñeco Sorpresa →',
+      '   Payasita, Conejo Chispa, Coneja Maricusa). En el admin un toggle',
+      '   “Servicio con variantes” activa el editor; en la tienda la card',
+      '   muestra el badge “🎭 N variantes”, el modal tiene selector con',
+      '   fotos y el modal de RESERVA deja elegir la variante al añadir el',
+      '   servicio (el ítem de la reserva guarda “Servicio — Variante”).',
+      ' - NUEVO (V52.5) ⭐ COMPRESIÓN DE IMÁGENES EN EL CLIENTE (fix del',
+      '   error 502): las fotos de móvil modernas (8–12 MB) se comprimen',
+      '   automáticamente EN EL NAVEGADOR antes de subir (borde 1600px,',
+      '   WebP ~800KB, calidad adaptativa). Aplica a TODAS las subidas del',
+      '   admin: servicios, variantes, galería, secciones, categorías y',
+      '   productos. El límite del servidor subió a 25MB como red de',
+      '   seguridad y ya NO se rechazan fotos por peso.',
+      ' - NUEVO (V52.5) Precios de Servicios SOLO EN USD en el admin: el',
+      '   peso (CUP) se calcula automáticamente (1 USD = 700 CUP) y la',
+      '   tienda sigue mostrando ambas monedas como siempre.',
+      ' - NUEVO (V52.5) Galería del admin: guía de uso visible, botón',
+      '   “Añadir fotos al carrusel” con progreso “Subiendo 2/5…”, barra',
+      '   de progreso y avisos por foto fallida (sin perder las que sí',
+      '   subieron). El carrusel de cada categoría se llena expandiendo la',
+      '   categoría y subiendo fotos (se comprimen automáticamente).',
+      ' - FIX (V52.5) La notificación de “instalar app móvil” ya NO aparece',
+      '   en PC/portátiles: solo se muestra en teléfonos y tablets.',
+      ' - FOTOS REALES (V52.5): muñecos sorpresa (payasita humana), cañón',
+      '   de confeti sobre pétalos, vela volcánica, pullover sublimado y',
+      '   jarra personalizada con las fotos reales del negocio. En BDs',
+      '   existentes se aplican SOLO si el servicio no tiene foto propia',
+      '   del admin (nunca se pisan tus subidas).',
+      ' - FIX CRÍTICO (V52.4): se reconstruyeron las 5 rutas de subida de',
+      '   imágenes del admin (productos, categorías, galería, secciones y',
+      '   servicios) que se habían PERDIDO del código fuente — el admin',
+      '   vuelve a poder cambiar todas las fotos de la tienda. Convierten a',
+      '   WebP con sharp y espejan en .next/standalone para Railway.',
+      ' - NUEVO (V52.4) “Ver más” en Servicios: se muestran 8 cards y el',
+      '   botón despliega el resto (útil al crecer el catálogo), contador',
+      '   “Mostrando N de M” al filtrar/buscar y botón “Compartir',
+      '   servicio” por WhatsApp en el modal de detalle.',
       ' - Servicios para Eventos: cards VERTICALES con foto protagonista',
       '   real (pullover personalizado, payasita humana, decoración, globos…)',
-      '   + gestión completa desde el admin (crear/editar/ordenar/subir foto)',
+      '   + gestión completa desde el admin (crear/editar/ordenar/subir foto).',
+      '   Filtros por categoría, modal “Ver detalle” con foto grande y',
+      '   botón de consultar por WhatsApp, skeletons de carga y lightbox de',
+      '   la foto a pantalla completa (clic en “Ampliar”).',
+      '   NUEVO (V52.3): buscador de servicios por texto (nombre, descripción',
+      '   o categoría) con botón de limpiar.',
       ' - Promociones v2: card de la promoción (ej: Día de las Madres) con',
       '   las cards de los COMBOS dentro — cada combo se conforma desde el',
       '   admin eligiendo MÁS DE UN producto (suma de precios + descuento).',
-      '   El cliente puede pedir el combo completo de un clic.',
+      '   El cliente puede pedir el combo completo de un clic o compartirlo',
+      '   por WhatsApp. Chip “faltan N días” en el banner de la promo,',
+      '   botón “Compartir” la promoción completa por WhatsApp y lightbox de',
+      '   las fotos de los productos (teclado ←/→/Esc + miniaturas).',
+      '   NUEVO (V52.3): vista previa EN VIVO del combo en el editor del',
+      '   admin (mini-card espejo de la tienda: collage, precios, −%).',
+      ' - NUEVO (V52.3) Centro de Descargas en el Dashboard del admin:',
+      '   versión pendiente, historial de paquetes, botón de descarga y',
+      '   verificación del paquete SIN gastar la versión (dryRun).',
+      ' - NUEVO (V52.3) Botón flotante “volver arriba” en la tienda,',
+      '   scrollbar vertical elegante en listas (carrito, wishlist, admin)',
+      '   y anillos de foco accesibles en botones de cards.',
+      ' - FIX empaquetado: el conversor PNG/JPG→WebP del ZIP volvió a',
+      '   funcionar (IMAGE_EXTENSIONS se había corrompido) y el reescritor',
+      '   de referencias ya no altera literales de código fuente.',
+      ' - /api/download soporta ?dryRun=1 (sondeos sin consumir versión).',
       ' - Galería v2: portadas por categoría + carrusel + lightbox gigante',
       ' - Imágenes de secciones configurables (sembradas en BD + subida admin)',
       ' - Dock de navegación móvil + header compacto',
@@ -635,15 +937,22 @@ async function buildProjectZip(
     );
 
     // 8. Solo tras una construcción + verificación EXITOSA se consume la versión
-    state.next = versionNumber + 1;
-    state.historial.unshift({
-      version: versionNumber,
-      fecha: generatedAt,
-      archivos: allEntries.length,
-      bytesZip: buffer.length,
-    });
-    if (state.historial.length > HISTORIAL_MAX) state.historial.length = HISTORIAL_MAX;
-    await writeVersionState(state);
+    //    (dryRun: sondeos de QA/monitoreo sin avanzar el contador)
+    if (consume) {
+      state.next = versionNumber + 1;
+      state.historial.unshift({
+        version: versionNumber,
+        fecha: generatedAt,
+        archivos: allEntries.length,
+        bytesZip: buffer.length,
+      });
+      if (state.historial.length > HISTORIAL_MAX) state.historial.length = HISTORIAL_MAX;
+      await writeVersionState(state);
+    } else {
+      console.log(
+        `[project-zip] ${version} (dryRun, sin consumir versión) — ${allEntries.length} archivos, fingerprint ${fingerprint.slice(0, 12)}…`
+      );
+    }
 
     const prefix = options.filenamePrefix || 'dulce-encanto';
     const filename = `${prefix}-${version}.zip`;

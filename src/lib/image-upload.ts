@@ -4,13 +4,16 @@
  * Módulo de subida de imágenes — Díaz Premium Envíos
  *
  * Flujo:
- *   1. optimizeImage(): comprime/convierte a WebP en el cliente → data URL temporal
- *   2. uploadImage(): usa optimizeImage + sube el Blob al servidor → ruta /products/xxx.webp
+ *   1. compressImageFile(): comprime/redimensiona a WebP EN EL CLIENTE
+ *      (fix V52.5 del error 502 con fotos de móvil de 8MB+)
+ *   2. uploadImage(): sube el archivo ya comprimido al servidor → /products/xxx.webp
+ *   3. optimizeImage(): data URL temporal SOLO para previsualizar en el form
  *
  * IMPORTANTE: NUNCA se guarda el data URL (Base64) en la base de datos.
- * Solo se usa temporalmente para previsualización y como paso intermedio
- * antes de subir el archivo físico al servidor.
+ * Solo se usa temporalmente para previsualización.
  */
+
+import { compressImageFile } from '@/lib/compress-image';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contador de uploads activos — permite que el formulario bloquee el guardado
@@ -44,8 +47,12 @@ export function getActiveUploads(): number {
  */
 export function optimizeImage(file: File, maxW = 800, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (file.size > 8 * 1024 * 1024) {
-      reject(new Error(`La imagen pesa ${(file.size / 1024 / 1024).toFixed(1)}MB. El máximo es 8MB.`));
+    // V52.5: límite subido a 50MB — las fotos de móvil modernas pesan 8-12MB
+    // y ahora se COMPRIMEN antes de subir (ver lib/compress-image.ts). El
+    // objetivo de este límite es solo evitar congelar el navegador con
+    // archivos absurdos, no rechazar fotos normales.
+    if (file.size > 50 * 1024 * 1024) {
+      reject(new Error(`La imagen pesa ${(file.size / 1024 / 1024).toFixed(0)}MB. El máximo es 50MB.`));
       return;
     }
 
@@ -140,15 +147,21 @@ function dataURLtoBlob(dataURL: string): Blob {
 export async function uploadImage(file: File, maxW = 800, quality = 0.75): Promise<string> {
   _activeUploads++;
   try {
-    // 1. Comprimir y convertir a WebP en el cliente
-    const dataUrl = await optimizeImage(file, maxW, quality);
+    // 1. Comprimir en el cliente (V52.5 — fix del 502 con fotos de móvil de 8MB+).
+    //    compressImageFile ya respeta maxEdge como borde largo; para mantener
+    //    el contrato histórico (maxW = ANCHO máximo) le pasamos un borde algo
+    //    mayor cuando la foto es vertical, y bajamos el objetivo de bytes para
+    //    imágenes de producto (se ven en cards pequeñas).
+    const targetEdge = maxW <= 400 ? 480 : maxW <= 800 ? 960 : maxW <= 900 ? 1080 : maxW;
+    const compressed = await compressImageFile(file, {
+      maxEdge: targetEdge,
+      targetBytes: 700 * 1024,
+      quality: Math.max(0.6, quality),
+    });
 
-    // 2. Convertir data URL a Blob (sin usar fetch para evitar bloqueo CSP)
-    const blob = dataURLtoBlob(dataUrl);
-
-    // 3. Enviar al servidor vía multipart/form-data
+    // 2. Enviar al servidor vía multipart/form-data
     const formData = new FormData();
-    formData.append('file', blob, 'image.webp');
+    formData.append('file', compressed, compressed.name);
 
     // Incluir token de admin para autenticación
     const token = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;

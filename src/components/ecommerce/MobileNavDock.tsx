@@ -11,20 +11,20 @@
  *     soporte para safe-area (iPhone con notch).
  *   · Item activo con píldora degradada elevada (el icono "salta" fuera
  *     de la barra, estilo tab bar de iOS/Android).
- *   · Se OCULTA al bajar (para no tapar contenido) y reaparece al subir
- *     o al tocar la pantalla — no molesta mientras se navega el catálogo.
+ *   · V52.6: SIEMPRE visible (no se oculta al hacer scroll) para que los
+ *     clientes puedan navegar de inmediato a las diferentes secciones.
  *   · Se alimenta de las mismas secciones configurables del admin
  *     (siteconfig.navSections) que el menú de escritorio.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Home, ShoppingBag, CalendarHeart, Sparkles, Percent, Images,
   Clock, MapPin, DollarSign, Grid3X3, Package, User, CalendarPlus,
   type LucideIcon,
 } from 'lucide-react';
 import { useAppStore, type AppView } from '@/store/app-store';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface DockItem {
   id: string;
@@ -76,8 +76,6 @@ export function MobileNavDock() {
   const currentView = useAppStore((s) => s.currentView);
   const setView = useAppStore((s) => s.setView);
   const [items, setItems] = useState<DockItem[]>(FALLBACK_ITEMS);
-  const [visible, setVisible] = useState(true);
-  const lastY = useRef(0);
 
   // Cargar secciones configurables (mismas que el menú de escritorio)
   useEffect(() => {
@@ -105,26 +103,8 @@ export function MobileNavDock() {
       .catch(() => {});
   }, []);
 
-  // Auto-ocultar al bajar / mostrar al subir (con umbral para evitar parpadeos)
-  useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastY.current;
-      if (y < 80) {
-        setVisible(true);
-      } else if (delta > 8) {
-        setVisible(false); // bajando
-      } else if (delta < -8) {
-        setVisible(true); // subiendo
-      }
-      lastY.current = y;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Siempre visible al cambiar de vista
-  useEffect(() => { setVisible(true); }, [currentView]);
+  // V52.6 — el dock es SIEMPRE visible: los clientes pueden saltar a
+  // cualquier sección en cualquier momento sin importar el scroll.
 
   const go = useCallback((id: string) => {
     setView(id as AppView);
@@ -146,18 +126,15 @@ export function MobileNavDock() {
       {/* Espaciador para que el dock no tape el footer */}
       <div className="h-[84px] lg:hidden" aria-hidden />
 
-      <AnimatePresence>
-        {visible && (
-          <motion.nav
-            key="mobile-dock"
-            initial={{ y: 90 }}
-            animate={{ y: 0 }}
-            exit={{ y: 90 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-40 lg:hidden pointer-events-none"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
-            aria-label="Navegación principal"
-          >
+      <motion.nav
+        key="mobile-dock"
+        initial={{ y: 90 }}
+        animate={{ y: 0 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        className="fixed bottom-0 left-0 right-0 z-40 lg:hidden pointer-events-none"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
+        aria-label="Navegación principal"
+      >
             <div className="px-3">
               <div
                 className="max-w-md mx-auto flex items-end justify-around rounded-[26px] px-2 pt-2 pb-1.5 pointer-events-auto"
@@ -233,9 +210,7 @@ export function MobileNavDock() {
                 </button>
               </div>
             </div>
-          </motion.nav>
-        )}
-      </AnimatePresence>
+      </motion.nav>
     </>
   );
 }

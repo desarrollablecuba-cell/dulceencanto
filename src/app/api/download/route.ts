@@ -30,8 +30,16 @@ export const maxDuration = 300;
  *  Excluye por diseño: node_modules, .next, .git, .env (secretos),
  *  upload/, download/, db/ local, logs, etc.
  */
-export async function GET() {
-  const result = await createProjectZip({ filenamePrefix: 'dulce-encanto' });
+export async function GET(request: Request) {
+  // ?dryRun=1 → genera y verifica el paquete SIN consumir el número de
+  // versión. Pensado para sondeos de monitoreo/QA (p.ej. el cron de
+  // revisión) que no deben quemar la V que le toca al usuario.
+  const dryRun = new URL(request.url).searchParams.get('dryRun') === '1';
+
+  const result = await createProjectZip({
+    filenamePrefix: 'dulce-encanto',
+    consumeVersion: !dryRun,
+  });
 
   if (!result.ok || !result.buffer) {
     console.error('[/api/download]', result.error);
@@ -48,6 +56,7 @@ export async function GET() {
   headers.set('Content-Length', String(zip.buffer.length));
   headers.set('X-File-Count', String(zip.fileCount));
   headers.set('X-Version', zip.version);
+  if (dryRun) headers.set('X-Dry-Run', 'true');
   headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   headers.set('Access-Control-Allow-Origin', '*');
 

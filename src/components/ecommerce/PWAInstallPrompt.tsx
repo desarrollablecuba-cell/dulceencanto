@@ -16,7 +16,30 @@ interface BeforeInstallPromptEvent extends Event {
  *  - El navegador soporta PWA (beforeinstallprompt event)
  *  - El usuario no lo ha descartado antes (localStorage)
  *  - Estamos en la página /admin
+ *  - ⭐ Estamos en un DISPOSITIVO MÓVIL (teléfono/tablet). En PC/portátiles
+ *    el banner NO se muestra: el admin se usa con teclado y ratón, y la
+ *    notificación de "instalar app móvil" resulta confusa (fix V52.5).
  */
+
+/**
+ * Detecta si el dispositivo actual es móvil (teléfono o tablet).
+ * Combinación robusta de heurísticas:
+ *  - matchMedia('(pointer: coarse)') → pantalla táctil principal (móvil/tablet)
+ *  - viewport angcho (≤ 900px) → tablet en horizontal o teléfono
+ *  - User-Agent con marcas de móvil (fallback para WebView antiguos)
+ * Los navegadores de escritorio con devtools táctil NO cuentan salvo que
+ * el ancho también sea de móvil.
+ */
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+  const narrowViewport = window.innerWidth <= 900;
+  const uaMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent);
+  // Móvil si: puntero táctil Y pantalla angosta, o UA claramente móvil.
+  // (pointer:coarse solo también matchea algunas laptops con pantalla táctil,
+  // por eso exigimos además el ancho o el UA)
+  return (coarsePointer && (narrowViewport || uaMobile)) || uaMobile;
+}
 export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
@@ -25,6 +48,9 @@ export function PWAInstallPrompt() {
   useEffect(() => {
     // Solo mostrar en /admin
     if (!window.location.pathname.startsWith('/admin')) return;
+
+    // ⭐ Solo en dispositivos móviles — en PC el banner no aplica (V52.5)
+    if (!isMobileDevice()) return;
 
     // Verificar si ya está instalada
     if (window.matchMedia('(display-mode: standalone)').matches) {

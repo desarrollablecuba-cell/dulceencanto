@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Plus, GripVertical, RefreshCw, Loader2, ImagePlus, ChevronUp, ChevronDown } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { compressImageFile } from '@/lib/compress-image';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  PromotionManager — editor visual de promociones (CRUD via API)
@@ -191,10 +193,13 @@ function adminAuthHeaders(json = false): Record<string, string> {
   return headers;
 }
 
-/** Sube una imagen a /api/admin/gallery/upload y devuelve la URL servible. */
+/** Sube una imagen a /api/admin/gallery/upload y devuelve la URL servible.
+ *  V52.5: comprime EN EL CLIENTE antes de enviar (fix del 502 con fotos de
+ *  móvil de 8MB+) — la galería usa carruseles grandes → borde 1800px. */
 async function uploadGalleryImage(file: File): Promise<string> {
+  const compressed = await compressImageFile(file, { maxEdge: 1800, targetBytes: 900 * 1024 });
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('file', compressed);
   const res = await fetch('/api/admin/gallery/upload', {
     method: 'POST',
     headers: adminAuthHeaders(),
@@ -211,7 +216,10 @@ export function GalleryManager() {
   const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  /** V52.5 — progreso de subida múltiple: { catId, done, total }. */
+  const [progress, setProgress] = useState<{ catId: string; done: number; total: number } | null>(null);
   const [error, setError] = useState<string>('');
+  const { toast } = useToast();
 
   const load = () => {
     setLoading(true);
@@ -279,6 +287,7 @@ export function GalleryManager() {
         body: JSON.stringify({ id: catId, cover: url }),
       });
       load();
+      toast({ title: '🖼️ Portada actualizada', description: 'La nueva portada ya está visible en la tienda.', duration: 2500 });
     } catch (e: any) {
       alert(e?.message || 'No se pudo subir la portada');
     }
@@ -286,25 +295,51 @@ export function GalleryManager() {
 
   // ── Fotos ──
   const uploadPhotos = async (catId: string, files: FileList) => {
+    const total = files.length;
     setUploadingFor(catId);
+    setProgress({ catId, done: 0, total });
     try {
-      for (const file of Array.from(files)) {
-        const url = await uploadGalleryImage(file);
-        const res = await fetch('/api/admin/gallery/photos', {
-          method: 'POST',
-          headers: adminAuthHeaders(true),
-          body: JSON.stringify({ categoryId: catId, image: url, title: '' }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'No se pudo guardar la foto');
+      let n = 0;
+      let lastErr: string | null = null;
+      for (let i = 0; i < total; i++) {
+        setProgress({ catId, done: i, total });
+        try {
+          const url = await uploadGalleryImage(files[i]);
+          const res = await fetch('/api/admin/gallery/photos', {
+            method: 'POST',
+            headers: adminAuthHeaders(true),
+            body: JSON.stringify({ categoryId: catId, image: url, title: '' }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'No se pudo guardar la foto');
+          }
+          n++;
+        } catch (e: any) {
+          lastErr = e?.message || 'No se pudo subir una de las fotos';
         }
       }
       load();
+      if (n > 0) {
+        toast({
+          title: `📷 ${n} ${n === 1 ? 'foto subida' : 'fotos subidas'} al carrusel`,
+          description: 'Ya se muestran en la galería de la tienda (se comprimieron automáticamente).',
+          duration: 3000,
+        });
+      }
+      if (lastErr) {
+        toast({
+          title: `⚠️ ${total - n} ${total - n === 1 ? 'foto no se pudo subir' : 'fotos no se pudieron subir'}`,
+          description: lastErr,
+          variant: 'destructive',
+          duration: 5000,
+        });
+      }
     } catch (e: any) {
       alert(e?.message || 'No se pudo subir la imagen');
     } finally {
       setUploadingFor(null);
+      setProgress(null);
     }
   };
 
@@ -357,6 +392,13 @@ export function GalleryManager() {
 
   return (
     <div className="space-y-4">
+      {/* V52.5 — guía de uso: el carrusel se llena expandiendo la categoría */}
+      <div className="rounded-xl p-3 text-xs flex items-start gap-2.5" style={{ background: '#FDF2F8', border: '1px solid #FBCFE8', color: '#9D174D' }}>
+        <span className="text-base leading-none mt-0.5" aria-hidden>💡</span>
+        <p className="leading-relaxed">
+          Las fotos del <strong>carrusel</strong> de cada categoría (15 Años, Bodas…) se suben <strong>expandiendo la categoría</strong> (clic en su portada) y pulsando <strong>“Añadir fotos”</strong>. Puedes seleccionar varias a la vez — se comprimen automáticamente. La <strong>portada</strong> es la imagen grande que se ve en el grid público.
+        </p>
+      </div>
       {cats.map((cat) => {
         const isOpen = openId === cat.id;
         return (
@@ -449,14 +491,20 @@ export function GalleryManager() {
                 <div className="rounded-lg border border-dashed border-purple-200 p-3" style={{ background: '#FAF5FF' }}>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-xs font-bold" style={{ color: '#7E22CE' }}>
-                      📸 Fotos de eventos reales ({cat.photos.length})
+                      📸 Fotos del carrusel de esta categoría ({cat.photos.length})
                     </Label>
                     <label
                       className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white cursor-pointer inline-flex items-center gap-1"
                       style={{ background: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)', opacity: uploadingFor === cat.id ? 0.6 : 1 }}
                     >
-                      {uploadingFor === cat.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                      {uploadingFor === cat.id ? 'Subiendo…' : 'Añadir fotos'}
+                      {uploadingFor === cat.id
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <Plus className="h-3.5 w-3.5" />}
+                      {uploadingFor === cat.id
+                        ? (progress && progress.catId === cat.id
+                            ? `Subiendo ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
+                            : 'Preparando…')
+                        : 'Añadir fotos al carrusel'}
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif"
@@ -469,6 +517,12 @@ export function GalleryManager() {
                       />
                     </label>
                   </div>
+                  {/* Barra de progreso V52.5 */}
+                  {uploadingFor === cat.id && progress && progress.catId === cat.id && (
+                    <div className="mb-2 h-1.5 rounded-full overflow-hidden" style={{ background: '#F3E8FF' }}>
+                      <div className="h-full transition-all duration-300" style={{ width: `${(progress.done / Math.max(progress.total, 1)) * 100}%`, background: 'linear-gradient(90deg, #EC4899 0%, #A855F7 100%)' }} />
+                    </div>
+                  )}
                   {cat.photos.length === 0 ? (
                     <p className="text-xs text-gray-400 py-3 text-center">
                       Todavía no hay fotos. Sube imágenes de eventos reales de este tipo — se verán en el carrusel público.
@@ -556,6 +610,7 @@ const SECTION_IMAGE_META: { id: string; label: string; icon: string; fallback: s
 
 export function SectionImagesEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [uploading, setUploading] = useState<string | null>(null);
+  const { toast } = useToast();
 
   let images: Record<string, string> = {};
   try {
@@ -575,8 +630,10 @@ export function SectionImagesEditor({ value, onChange }: { value: string; onChan
   const upload = async (id: string, file: File) => {
     setUploading(id);
     try {
+      // V52.5: comprimir en el cliente antes de subir (fix 502)
+      const compressed = await compressImageFile(file, { maxEdge: 1600, targetBytes: 800 * 1024 });
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       const res = await fetch('/api/admin/sections/upload', {
         method: 'POST',
         headers: adminAuthHeaders(),
@@ -585,6 +642,7 @@ export function SectionImagesEditor({ value, onChange }: { value: string; onChan
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Error al subir (${res.status})`);
       commit({ ...images, [id]: data.url });
+      toast({ title: '🖼️ Imagen de sección actualizada', description: 'Se guarda al pulsar “Guardar Cambios”.', duration: 2500 });
     } catch (e: any) {
       alert(e?.message || 'No se pudo subir la imagen');
     } finally {
@@ -653,8 +711,18 @@ export function SectionImagesEditor({ value, onChange }: { value: string; onChan
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ServicesManager — CRUD de Servicios para Eventos (cards verticales con
-//  imagen protagonista). API: /api/admin/services (requiere admin).
+//  ServicesManager — CRUD de Servicios para Eventos (V52.5 refactorizado)
+//
+//  · Cards verticales con imagen protagonista (foto real del negocio).
+//  · Precio SOLO EN USD (petición del negocio) — el CUP se deriva
+//    automáticamente (price = priceUsd × 700) y se muestra como referencia
+//    de solo lectura.
+//  · Toggle "Servicio con variantes": activa el editor de variantes, donde
+//    cada variante tiene NOMBRE + FOTO propia (+ precio USD opcional).
+//    Ej: Muñeco Sorpresa → Payasita / Conejo Chispa / Coneja Maricusa.
+//  · Subidas comprimidas EN EL CLIENTE (fix del 502 con fotos de 8MB+).
+//
+//  API: /api/admin/services (requiere admin).
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface ServiceRow {
@@ -668,6 +736,16 @@ interface ServiceRow {
   category: string;
   active: boolean;
   order: number;
+  variants: ServiceVariantRow[];
+}
+
+interface ServiceVariantRow {
+  id: string;
+  name: string;
+  image: string;
+  priceUsd: number;
+  active: boolean;
+  order: number;
 }
 
 const SERVICE_CATEGORIES = [
@@ -677,10 +755,36 @@ const SERVICE_CATEGORIES = [
   { value: 'suenos_sorpresa', label: '🙀 Sueños Sorpresa' },
 ];
 
-/** Sube la imagen de un servicio a /api/admin/services/upload → /services/xxx.webp */
+/** Tasa de referencia para mostrar el CUP derivado (solo informativo). */
+const USD_RATE = 700;
+
+/** Parsea variants del servicio (string JSON del backend o array ya parseado). */
+function toVariantRows(raw: unknown): ServiceVariantRow[] {
+  if (Array.isArray(raw)) {
+    return raw.map((v: any, i) => ({
+      id: String(v?.id || `var-${Date.now().toString(36)}-${i}`),
+      name: String(v?.name || ''),
+      image: String(v?.image || ''),
+      priceUsd: Number(v?.priceUsd) || 0,
+      active: v?.active !== false,
+      order: Number.isFinite(Number(v?.order)) ? Number(v.order) : i,
+    }));
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try { return toVariantRows(JSON.parse(raw)); } catch { return []; }
+  }
+  return [];
+}
+
+const newVariantId = () => `var-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/** Sube la imagen de un servicio (o variante) a /api/admin/services/upload.
+ *  V52.5: comprime EN EL CLIENTE antes de enviar (fix del 502 con fotos de
+ *  móvil de 8MB+) → borde 1600px, objetivo ~800KB. */
 async function uploadServiceImage(file: File): Promise<string> {
+  const compressed = await compressImageFile(file, { maxEdge: 1600, targetBytes: 800 * 1024 });
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('file', compressed);
   const res = await fetch('/api/admin/services/upload', {
     method: 'POST',
     headers: adminAuthHeaders(),
@@ -696,14 +800,16 @@ export function ServicesManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadingVariant, setUploadingVariant] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const load = () => {
     setLoading(true);
     fetch('/api/admin/services', { headers: adminAuthHeaders() })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setServices(data);
+        if (Array.isArray(data)) setServices(data.map((s: any) => ({ ...s, variants: toVariantRows(s.variants) })));
         else setError(data?.error || 'Respuesta inválida');
       })
       .catch(() => setError('No se pudieron cargar los servicios'))
@@ -736,18 +842,18 @@ export function ServicesManager() {
   };
 
   const addService = async () => {
-    const now = Date.now();
     const draft: ServiceRow = {
       id: '',
       name: 'Nuevo servicio',
       description: 'Describe el servicio para eventos…',
       icon: '✨',
       image: '',
-      price: 1000,
+      price: 0,
       priceUsd: 2,
       category: 'decoracion',
       active: true,
       order: (services.length ? Math.max(...services.map((s) => s.order)) + 1 : 0),
+      variants: [],
     };
     try {
       const res = await fetch('/api/admin/services', {
@@ -757,7 +863,7 @@ export function ServicesManager() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-      setServices((list) => [...list, { ...draft, ...data }]);
+      setServices((list) => [...list, { ...draft, ...data, variants: toVariantRows(data.variants) }]);
     } catch (e: any) {
       setError(e?.message || 'Error al crear el servicio');
     }
@@ -805,10 +911,63 @@ export function ServicesManager() {
         headers: adminAuthHeaders(true),
         body: JSON.stringify({ ...svc, image: path }),
       });
+      toast({ title: '🖼️ Foto del servicio actualizada', description: `${svc.name} — guardada y visible en la tienda.`, duration: 2500 });
     } catch (e: any) {
       setError(e?.message || 'Error al subir la imagen');
     } finally {
       setUploadingId(null);
+    }
+  };
+
+  // ── Variantes ──
+  const hasVariants = (svc: ServiceRow) => svc.variants.length > 0;
+
+  const toggleVariants = (svc: ServiceRow) => {
+    if (hasVariants(svc)) {
+      if (!confirm('¿Quitar TODAS las variantes de este servicio? Volverá a mostrarse como un servicio simple.')) return;
+      const next = { ...svc, variants: [] };
+      patch(svc.id, { variants: [] });
+      save(next);
+      return;
+    }
+    const first: ServiceVariantRow = { id: newVariantId(), name: '', image: '', priceUsd: 0, active: true, order: 0 };
+    patch(svc.id, { variants: [first] });
+  };
+
+  const patchVariant = (svcId: string, varId: string, fields: Partial<ServiceVariantRow>) =>
+    setServices((list) => list.map((s) => (s.id === svcId
+      ? { ...s, variants: s.variants.map((v) => (v.id === varId ? { ...v, ...fields } : v)) }
+      : s)));
+
+  const addVariant = (svc: ServiceRow) => {
+    const next = [...svc.variants, { id: newVariantId(), name: '', image: '', priceUsd: 0, active: true, order: svc.variants.length }];
+    patch(svc.id, { variants: next });
+  };
+
+  const removeVariant = (svc: ServiceRow, varId: string) => {
+    patch(svc.id, { variants: svc.variants.filter((v) => v.id !== varId).map((v, i) => ({ ...v, order: i })) });
+  };
+
+  const moveVariant = (svc: ServiceRow, varId: string, dir: -1 | 1) => {
+    const arr = [...svc.variants].sort((a, b) => a.order - b.order);
+    const idx = arr.findIndex((v) => v.id === varId);
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    patch(svc.id, { variants: arr.map((v, i) => ({ ...v, order: i })) });
+  };
+
+  const uploadVariantImg = async (svc: ServiceRow, varId: string, file: File) => {
+    setUploadingVariant(varId);
+    setError(null);
+    try {
+      const path = await uploadServiceImage(file);
+      patchVariant(svc.id, varId, { image: path });
+      toast({ title: '🖼️ Foto de la variante lista', description: 'Pulsa Guardar para aplicarla en la tienda.', duration: 2500 });
+    } catch (e: any) {
+      setError(e?.message || 'Error al subir la imagen de la variante');
+    } finally {
+      setUploadingVariant(null);
     }
   };
 
@@ -829,7 +988,7 @@ export function ServicesManager() {
       )}
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-gray-500">
-          {sorted.length} {sorted.length === 1 ? 'servicio' : 'servicios'} · la foto es la protagonista de la card vertical
+          {sorted.length} {sorted.length === 1 ? 'servicio' : 'servicios'} · precio en <strong>USD</strong> (el CUP se calcula solo) · la foto es la protagonista de la card
         </p>
         <Button variant="outline" size="sm" type="button" onClick={addService}>
           <Plus className="h-4 w-4 mr-1" /> Agregar servicio
@@ -841,13 +1000,15 @@ export function ServicesManager() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        {sorted.map((s) => (
+        {sorted.map((s) => {
+          const vOn = hasVariants(s);
+          return (
           <div key={s.id} className={`rounded-lg border p-3 space-y-2 ${s.active ? 'border-pink-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-70'}`}>
             <div className="flex gap-3">
               {/* Imagen protagonista (preview vertical 3:4) */}
               <div className="relative w-24 shrink-0 rounded-lg overflow-hidden border border-gray-200 bg-gray-100" style={{ aspectRatio: '3 / 4' }}>
                 {s.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                   
                   <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-3xl">{s.icon || '✨'}</div>
@@ -856,6 +1017,11 @@ export function ServicesManager() {
                   <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
                     <Loader2 className="h-5 w-5 animate-spin text-pink-600" />
                   </div>
+                )}
+                {vOn && s.variants.length > 0 && (
+                  <span className="absolute bottom-1 left-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-white text-center" style={{ background: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)' }}>
+                    {s.variants.length} {s.variants.length === 1 ? 'variante' : 'variantes'}
+                  </span>
                 )}
               </div>
               {/* Campos */}
@@ -889,26 +1055,20 @@ export function ServicesManager() {
                   placeholder="Descripción"
                 />
                 <div className="flex gap-2 flex-wrap items-center">
+                  {/* V52.5 — precio SOLO en USD (el CUP se deriva ×700) */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-gray-400">₱</span>
-                    <Input
-                      type="number" min={0}
-                      value={s.price}
-                      onChange={(e) => patch(s.id, { price: Number(e.target.value) || 0 })}
-                      className="w-24 h-8 text-xs"
-                      aria-label="Precio CUP"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-gray-400">$</span>
+                    <span className="text-[10px] font-bold text-gray-500">$ USD</span>
                     <Input
                       type="number" min={0} step="0.01"
                       value={s.priceUsd}
                       onChange={(e) => patch(s.id, { priceUsd: Number(e.target.value) || 0 })}
-                      className="w-20 h-8 text-xs"
+                      className="w-24 h-8 text-xs"
                       aria-label="Precio USD"
                     />
                   </div>
+                  <span className="text-[10px] text-gray-400" title="El precio en pesos se calcula automáticamente con la tasa 1 USD = 700 CUP">
+                    ≈ ₱{Math.round((s.priceUsd || 0) * USD_RATE).toLocaleString('es-CU')} CUP (auto)
+                  </span>
                   <select
                     value={s.category}
                     onChange={(e) => patch(s.id, { category: e.target.value })}
@@ -922,6 +1082,123 @@ export function ServicesManager() {
                 </div>
               </div>
             </div>
+
+            {/* ⭐ Toggle: servicio con variantes (V52.5) */}
+            <div className="rounded-lg border p-2.5" style={{ background: vOn ? '#FDF2F8' : '#FAFAFA', borderColor: vOn ? '#FBCFE8' : '#F3F4F6' }}>
+              <label className="flex items-center justify-between gap-2 cursor-pointer select-none">
+                <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: vOn ? '#BE185D' : '#6B7280' }}>
+                  <span aria-hidden>🎭</span>
+                  {vOn ? 'Servicio CON variantes' : 'Servicio con variantes'}
+                  {vOn && <span className="font-normal text-[10px] text-gray-400">(cada una con su foto y nombre)</span>}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={vOn}
+                  onChange={() => toggleVariants(s)}
+                  className="accent-pink-600 h-4 w-4"
+                  aria-label={`Activar variantes para ${s.name}`}
+                />
+              </label>
+
+              {vOn && (
+                <div className="mt-2.5 space-y-2">
+                  {s.variants.length === 0 && (
+                    <p className="text-[11px] text-gray-400 italic">Agrega la primera variante (ej: Payasita, Conejo Chispa…).</p>
+                  )}
+                  {s.variants.map((v, i) => (
+                    <div key={v.id} className="flex gap-2 items-center rounded-lg border border-gray-200 bg-white p-1.5">
+                      {/* Foto de la variante */}
+                      <div className="relative w-12 h-14 shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                        {v.image ? (
+                           
+                          <img src={v.image} alt={v.name || 'Variante'} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-400 text-center px-0.5">sin foto</div>
+                        )}
+                        {uploadingVariant === v.id && (
+                          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-pink-600" />
+                          </div>
+                        )}
+                      </div>
+                      <label className="shrink-0 px-2 py-1 rounded-md text-[10px] font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)' }} title="Subir foto de la variante (se comprime automáticamente)">
+                        {v.image ? 'Cambiar' : 'Foto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadVariantImg(s, v.id, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {/* Nombre + precio opcional */}
+                      <div className="flex-1 min-w-0 flex gap-1.5">
+                        <Input
+                          value={v.name}
+                          onChange={(e) => patchVariant(s.id, v.id, { name: e.target.value })}
+                          placeholder="Nombre (ej: Payasita)"
+                          className="h-7 text-xs flex-1"
+                          aria-label="Nombre de la variante"
+                        />
+                        <div className="flex items-center gap-0.5 shrink-0" title="Precio USD opcional — vacío (0) usa el precio del servicio">
+                          <span className="text-[10px] text-gray-400">$</span>
+                          <Input
+                            type="number" min={0} step="0.01"
+                            value={v.priceUsd || ''}
+                            onChange={(e) => patchVariant(s.id, v.id, { priceUsd: Number(e.target.value) || 0 })}
+                            placeholder="auto"
+                            className="w-16 h-7 text-xs"
+                            aria-label="Precio USD de la variante (opcional)"
+                          />
+                        </div>
+                      </div>
+                      {/* Acciones */}
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button type="button" onClick={() => moveVariant(s, v.id, -1)} disabled={i === 0} className="text-gray-400 hover:text-purple-700 disabled:opacity-25" aria-label="Subir variante" title="Subir orden">
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button type="button" onClick={() => moveVariant(s, v.id, 1)} disabled={i === s.variants.length - 1} className="text-gray-400 hover:text-purple-700 disabled:opacity-25" aria-label="Bajar variante" title="Bajar orden">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <label className="shrink-0 flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer" title={v.active ? 'Visible en la tienda' : 'Oculta'}>
+                        <input
+                          type="checkbox"
+                          checked={v.active}
+                          onChange={(e) => patchVariant(s.id, v.id, { active: e.target.checked })}
+                          className="accent-green-600 h-3.5 w-3.5"
+                          aria-label={`Variante ${v.name || i + 1} visible`}
+                        />
+                        {v.active ? '👁' : '🚫'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(s, v.id)}
+                        className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-red-500 hover:bg-red-50"
+                        aria-label="Eliminar variante"
+                        title="Eliminar variante"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addVariant(s)}
+                    className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border border-dashed border-pink-300 text-pink-600 hover:bg-pink-50"
+                  >
+                    <Plus className="h-3 w-3" /> Agregar variante
+                  </button>
+                  <p className="text-[10px] text-gray-400">
+                    Ej: Servicio <em>Muñeco Sorpresa</em> → variantes <em>Payasita</em>, <em>Conejo Chispa</em>, <em>Coneja Maricusa</em>. El cliente verá las fotos y elegirá al reservar.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Acciones: foto, activo, orden, guardar */}
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-100">
               <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
@@ -968,10 +1245,11 @@ export function ServicesManager() {
               </Button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <p className="text-[11px] text-gray-400">
-        Recuerda pulsar <strong>Guardar</strong> tras editar textos o precios. La foto se guarda automáticamente al subirla.
+        Recuerda pulsar <strong>Guardar</strong> tras editar textos, precios o variantes. Las fotos se comprimen automáticamente al subirlas (ya no hay error 502 con fotos de móvil).
       </p>
     </div>
   );

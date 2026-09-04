@@ -104,6 +104,11 @@ export async function POST(request: Request) {
         // SIGECOS: disponibilidad
         posAvailable: productFields.posAvailable !== undefined ? Boolean(productFields.posAvailable) : true,
         tiendaAvailable: productFields.tiendaAvailable !== undefined ? Boolean(productFields.tiendaAvailable) : true,
+        // V52.6 — canales de venta (Venta Directa / Buffet para Repartir)
+        directSaleEnabled: productFields.directSaleEnabled !== undefined ? Boolean(productFields.directSaleEnabled) : true,
+        buffetEnabled: Boolean(productFields.buffetEnabled ?? false),
+        // V52.8 — precio del buffet por docena en USD (30 por defecto)
+        buffetPriceUsd: Number(productFields.buffetPriceUsd ?? 30) || 30,
         // SIGECOS: anticipo
         advanceType: productFields.advanceType || 'sin',
         advanceValue: Number(productFields.advanceValue ?? 0),

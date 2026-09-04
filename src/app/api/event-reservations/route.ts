@@ -4,6 +4,23 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** V52.7 — antelación máxima (días) requerida por los productos de la reserva. */
+async function maxLeadDaysFor(productIds: string[]): Promise<number> {
+  if (productIds.length === 0) return 0;
+  const products = await db.product.findMany({
+    where: { id: { in: productIds } },
+    select: { reservationDays: true },
+  });
+  return products.reduce((max, p) => Math.max(max, Number(p.reservationDays) || 0), 0);
+}
+
+/** V52.7 — fecha mínima reservable (YYYY-MM-DD) = hoy + leadDays. */
+function minReservableDate(leadDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + leadDays);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function GET() {
   try {
     const reservations = await db.eventReservation.findMany({
@@ -32,6 +49,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // ── V52.7 — respetar la antelación de los productos reservables ──
+    // La fecha del evento no puede ser anterior a hoy + mayor antelación
+    // de todos los productos incluidos en la reserva.
+    const productIds: string[] = (Array.isArray(items) ? items : [])
+      .filter((it: any) => String(it.itemType || '') === 'product' && it.itemId)
+      .map((it: any) => String(it.itemId));
+    const leadDays = await maxLeadDaysFor(productIds);
+    const minDate = minReservableDate(leadDays);
+    if (String(eventDate) < minDate) {
+      return NextResponse.json(
+        {
+          error: `La fecha del evento (${eventDate}) no cumple la antelación requerida: tu selección necesita ${leadDays} ${leadDays === 1 ? 'día' : 'días'} de elaboración. La fecha más cercana disponible es ${minDate}.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Calcular totales
     let totalCup = 0;
     let totalUsd = 0;
@@ -49,6 +83,8 @@ export async function POST(request: Request) {
         priceCup,
         priceUsd,
         notes: String(it.notes || ''),
+        // V52.7 — miniatura del servicio/producto/variante (para el admin y tickets)
+        image: String(it.image || ''),
       };
     });
 
@@ -71,6 +107,7 @@ export async function POST(request: Request) {
         status: 'pending',
         totalCup,
         totalUsd,
+        leadDays,
         createdAt: now,
         updatedAt: now,
         items: { create: itemsData },
@@ -87,8 +124,8 @@ export async function POST(request: Request) {
         '15_anos': '15 Años', cumple_ninos: 'Cumpleaños Infantil', cumple_adultos: 'Cumpleaños Adulto',
         boda: 'Boda', bautizo: 'Bautizo', otro: 'Otro Evento',
       };
-      const itemsText = itemsData.map((it: any) => `  • ${it.name} ×${it.quantity} — ₱${(it.priceCup * it.quantity).toLocaleString('es-CU')}`).join('\n');
-      const message = `🧁 *NUEVA RESERVA DE EVENTO* 🧁\n\n*Código:* ${code}\n*Tipo:* ${EVENT_LABELS[String(eventType)] || eventType}\n*Fecha:* ${eventDate}${eventTime ? ` a las ${eventTime}` : ''}\n*Cliente:* ${customerName}\n*Teléfono:* ${customerPhone}${customerEmail ? `\n*Email:* ${customerEmail}` : ''}${guestCount ? `\n*Invitados:* ${guestCount}` : ''}\n\n*Items:*\n${itemsText}\n\n*Total:* ₱${totalCup.toLocaleString('es-CU')} CUP${totalUsd > 0 ? ` · $${totalUsd.toFixed(2)} USD` : ''}\n${paymentMethod ? `*Pago:* ${paymentMethod}` : ''}${notes ? `\n\n*Notas:* ${notes}` : ''}`;
+      const itemsText = itemsData.map((it: any) => `  • ${it.name} ×${it.quantity} — $${(it.priceUsd * it.quantity).toFixed(2)} USD`).join('\n');
+      const message = `🧁 *NUEVA RESERVA DE EVENTO* 🧁\n\n*Código:* ${code}\n*Tipo:* ${EVENT_LABELS[String(eventType)] || eventType}\n*Fecha:* ${eventDate}${eventTime ? ` a las ${eventTime}` : ''}\n*Cliente:* ${customerName}\n*Teléfono:* ${customerPhone}${customerEmail ? `\n*Email:* ${customerEmail}` : ''}${guestCount ? `\n*Invitados:* ${guestCount}` : ''}\n\n*Items:*\n${itemsText}\n\n*Total:* $${totalUsd.toFixed(2)} USD${totalCup > 0 ? ` · ₡${totalCup.toLocaleString('es-CU')} CUP` : ''}${leadDays > 0 ? `\n*Antelación requerida:* ${leadDays} ${leadDays === 1 ? 'día' : 'días'}` : ''}\n${paymentMethod ? `*Pago:* ${paymentMethod}` : ''}${notes ? `\n\n*Notas:* ${notes}` : ''}`;
 
       // Construir URL de WhatsApp (el negocio recibe el mensaje al hacer clic)
       const waUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;

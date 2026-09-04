@@ -584,3 +584,104 @@ button:disabled {
     font-size: 12px;
   }
 }
+
+/* ── Skeleton shimmer (cards de servicios/promociones mientras cargan) ── */
+@keyframes shimmerSweep {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.shimmer-bg {
+  background: linear-gradient(90deg, #F3E8FF 25%, #FDF4FF 50%, #F3E8FF 75%);
+  background-size: 800px 100%;
+  animation: shimmerSweep 1.4s linear infinite;
+}
+
+/* ── Scrollbar vertical elegante (V52.3): listas largas del admin y tienda ──
+   Uso: <div className="max-h-XX overflow-y-auto nice-scroll"> … </div>
+   Firefox: thin + color de marca. WebKit: thumb gradiente con hover. */
+.nice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #C084FC #FDF7FF;
+  overscroll-behavior: contain;
+}
+.nice-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: #FDF7FF;
+  border-radius: 8px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #C084FC 0%, #EC4899 100%);
+  border-radius: 8px;
+  border: 2px solid #FDF7FF;
+}
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #A855F7 0%, #DB2777 100%);
+}
+
+/* ── Botón "volver arriba" flotante (V52.3) ──
+   Aparece tras hacer scroll; escondido en standalone para no tapar el dock.
+   V52.8 — APILADO con el botón de WhatsApp (mismo lado derecho):
+   móvil: dock (0–84) → WhatsApp (88–144) → esta flecha (152–196)
+   desktop ≥640px: WhatsApp (20–76) → flecha (84–128). Antes coincidían. */
+.scroll-top-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 152px; /* sobre el WhatsApp móvil (que está a 88px + 56px de alto) */
+  z-index: 60;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFF;
+  background: linear-gradient(135deg, #7E22CE 0%, #EC4899 100%);
+  box-shadow: 0 8px 24px -6px rgba(190, 24, 93, 0.55);
+  transition: transform 0.25s ease, opacity 0.25s ease, box-shadow 0.25s ease;
+}
+.scroll-top-fab:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 30px -6px rgba(190, 24, 93, 0.65);
+}
+.scroll-top-fab:active {
+  transform: translateY(0) scale(0.96);
+}
+.scroll-top-fab:focus-visible {
+  outline: 2px solid #7E22CE;
+  outline-offset: 3px;
+}
+@media (min-width: 640px) {
+  .scroll-top-fab {
+    bottom: 92px; /* desktop: sobre el WhatsApp (bottom-5 + 56-60px alto) con hueco claro */
+  }
+}
+@media (display-mode: standalone) {
+  .scroll-top-fab {
+    display: none;
+  }
+}
+
+/* ── Anillo de foco accesible unificado (V52.3) ──
+   Para botones personalizados de tienda que usan <button> sin clase shadcn. */
+.card-cta:focus-visible {
+  outline: 2px solid #7E22CE;
+  outline-offset: 2px;
+}
+
+/* Badge cinta de descuento (cards de combo en promociones) */
+.ribbon-discount {
+  position: absolute;
+  top: 14px;
+  right: -1px;
+  padding: 5px 14px 5px 18px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #FFF;
+  background: linear-gradient(135deg, #EC4899 0%, #BE185D 100%);
+  border-radius: 999px 0 0 999px;
+  box-shadow: 0 4px 12px -2px rgba(190, 24, 93, 0.55);
+}

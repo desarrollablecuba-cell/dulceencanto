@@ -1,29 +1,189 @@
 ════════════════════════════════════════════════════════════
  DULCE ENCANTO — PAQUETE DE DESPLIEGUE (Railway MySQL)
 ════════════════════════════════════════════════════════════
-Versión del paquete : V52
-Versión de la app   : 52.0.0 (package.json)
-Generado            : 2026-09-03T03:12:18.173Z (UTC)
-Archivos incluidos  : 383
-Tamaño (sin comprimir): 8.7 MB
-Fingerprint SHA-256 : 6e069022b1be7255b142879c3e9c1ceb0fd6eec1a9ed716b50af9a00dea194d8
+Versión del paquete : V53
+Versión de la app   : 53.0.0 (package.json)
+Generado            : 2026-09-04T23:13:52.909Z (UTC)
+Archivos incluidos  : 419
+Tamaño (sin comprimir): 11.1 MB
+Fingerprint SHA-256 : 4a40f80dd8d315923dfba52745a5815c49dc14b6a430936852d3d8d0c5f8adad
 Fuente              : código REAL del proyecto al generar el ZIP
 
 CÓMO COMPROBAR QUE DEPLOYASTE ESTA VERSIÓN
  1. Abre  https://TU-APP.up.railway.app/api/health
- 2. Debe mostrar  "appVersion": "52.0.0"  y  "status": "ok"
+ 2. Debe mostrar  "appVersion": "53.0.0"  y  "status": "ok"
  3. Si los counts de tables salen en 0 o status=error, lee el campo
     "hint" del JSON y los logs de arranque en Railway
     ([ddl]/[dulce]/[config]/[catalogo]/[galeria]).
 
 ESTE PAQUETE INCLUYE LA ÚLTIMA VERSIÓN DEL CÓDIGO (V52):
+ - NUEVO (V52.9) ⭐ EDITOR DE SERVICIOS RENOVADO (dos vistas, como
+   Productos): la sección “✨ Servicios” lista cada servicio en CARDS
+   con su FOTO real + detalles principales (categoría, precio USD,
+   variantes, estado, orden) y buscador con filtros por categoría.
+   Al entrar en un servicio se abre el EDITOR DETALLADO a pantalla
+   completa: pestañas Información / Variantes / «Vista en tienda»
+   (previsualiza la card pública tal y como la ve el cliente), barra
+   superior con Volver·Cancelar·Guardar y foto protagonista grande
+   con subida comprimida (8MB sin error 502).
+ - NUEVO (V52.9) ⭐ GALERÍA DE EVENTOS = SECCIÓN PROPIA DEL ADMIN:
+   el menú lateral tiene “🖼️ Galería” al nivel de Productos/Servicios
+   (antes estaba escondida en Ajustes → Secciones). Lista de
+   categorías con portada + nº de fotos y, al entrar en una, editor
+   completo: datos de la categoría (nombre, icono, descripción,
+   portada, visibilidad) y gestor de FOTOS con agregar varias de
+   golpe (con barra de progreso), EDITAR título y descripción,
+   REEMPLAZAR la imagen, ocultar sin borrar, reordenar y eliminar.
+   Incluye 12 fotos realistas de demo (fiestas de 15, cumpleaños
+   infantiles, de adultos y bodas) sembradas con
+   scripts/seed-gallery-v529.ts — bórralas desde el admin y sube las
+   tuyas reales.
+ - NUEVO (V52.8) ⭐ PRECIOS EN USD EN TODAS PARTES (excepto Venta
+   Directa en CUP): los productos RESERVABLES se muestran SIEMPRE en
+   $ USD (admin, catálogo, buscador, más vendidos y carrito), sin
+   importar el toggle de moneda. En el ADMIN, el editor de productos
+   carga/guarda el precio en la MONEDA DEL CANAL: los reservables se
+   editan en USD (badge morado “📅 Por reserva: precios en $ USD” +
+   conversión ≈ CUP en vivo) y los de venta directa en ₡ CUP (badge
+   verde). Los pedidos del admin se muestran en ₡ CUP (como se
+   guardan en BD). FIX: la flecha “volver arriba” ya NO se solapa con
+   el botón de WhatsApp (quedaron apilados en ambos tamaños).
+ - NUEVO (V52.8) ⭐ BUFFET PARA REPARTIR POR DOCENA: el buffet se
+   vende POR DOCENA en $USD igual que los dulces finos. Precio por
+   defecto: 30 USD la docena (columna buffetPriceUsd, se ajusta por
+   producto en el admin → pestaña Disponibilidad → “Precio del
+   Buffet — por docena”). En Reservas, la card y el detalle muestran
+   $30.00/docena con la etiqueta 🍬 y el ítem entra al carrito como
+   “— Docena”. La reserva de eventos también lo cotiza por docena.
+ - NUEVO (V52.8) ⭐ SERVICIOS = SECCIÓN PROPIA DEL ADMIN: el menú
+   lateral tiene “✨ Servicios” al nivel de Productos (antes estaba
+   escondido en Ajustes → Secciones). Página con encabezado, chips
+   informativos y el CRUD completo con variantes y fotos.
+ - NUEVO (V52.8) ⭐ RESERVA DE EVENTOS RE-DISEÑADA: modal ENORME
+   (max-w-6xl, casi pantalla completa) que APROVECHA las pantallas:
+   en desktop, panel lateral “Tu evento” SIEMPRE visible con las
+   miniaturas, cantidades, antelación y total en vivo; los SERVICIOS
+   se eligen con su FOTO REAL en cards visuales (antes solo emoji);
+   el buffet cotiza por docena; en móvil, mini-resumen en vivo en el
+   pie. Flujo mucho más fácil para los clientes.
+ - NUEVO (V52.7) ⭐ CARRITO EN USD (excepto Venta Directa en CUP): los
+   productos RESERVABLES se muestran y venden en $ USD; los de VENTA
+   DIRECTA siempre en ₡ CUP. El carrito muestra un banner del canal y
+   NO permite mezclar venta directa con reservables en un mismo
+   pedido (aviso claro al intentarlo, en todas las vías de compra).
+ - NUEVO (V52.7) ⭐ ADMIN — CATEGORÍA “VENTA DIRECTA” CON CONTROL DE
+   STOCK: en Productos hay un segmento 🛒 Venta Directa (stock ₡) que
+   abre la tabla de stock con edición INLINE (−/+ e input, se guarda
+   con Enter/al salir, feedback verde). El segmento 📅 Por Reserva
+   muestra el catálogo reservable en cards con su antelación. El
+   resto de las categorías son POR RESERVA por definición.
+ - NUEVO (V52.7) La categoría “Dulces Finos y Buffet” se llama ahora
+   SOLO “Buffet para Repartir” (los dulces finos van en su categoría
+   aparte). La migración v52.7 la renombra una sola vez en Railway.
+ - NUEVO (V52.7) ⭐ RESERVA DE EVENTOS COMPLETA: al reservar un evento
+   el cliente elige TODOS los productos y servicios RESERVABLES
+   (tortas, pasteles, cakes, dulces finos y el Buffet para Repartir)
+   con buscador, chips por categoría y grid visual con fotos. La
+   FECHA respeta la ANTELACIÓN: la más cercana disponible se calcula
+   desde hoy + el MAYOR tiempo de antelación de los productos del
+   pedido (ej: pastel de 2 pisos 7 días + dulces finos 2 días →
+   mínimo 7 días). El servidor valida la antelación al recibir la
+   reserva (error 400 si no cumple).
+ - NUEVO (V52.7) ⭐ VISTA AMPLIADA DE EVENTOS EN EL CALENDARIO DEL
+   ADMIN: el detalle muestra todos los productos y servicios con
+   MINIATURAS de foto (de cada servicio, producto o su variante),
+   datos completos, notas y totales en USD. El estado ahora SÍ se
+   persiste (PATCH /api/event-reservations/:id: confirmar/completar/
+   cancelar) y hay botón de escribir al cliente por WhatsApp.
+ - NUEVO (V52.7) ⭐ TICKET IMPRIMIBLE DEL EVENTO en DOS formatos:
+   🧾 80mm (impresora térmica de recibos) y 📄 Hoja Carta (detallada
+   con miniaturas y firma). Botones dentro del detalle del evento.
+ - NUEVO (V52.6) ⭐ ETIQUETA “POR DOCENA” EN LOS DULCES FINOS: las
+   cards de los dulces finos muestran desde fuera la etiqueta
+   “🍬 Por Docena” (sobre la foto + “/ docena” junto al precio y
+   “Precio por docena (12 unidades)” en el detalle), para que quede
+   claro que el precio es por la docena.
+ - NUEVO (V52.6) ⭐ CATEGORÍA “BUFFET PARA REPARTIR” EN RESERVAS:
+   dentro de Reservas aparece el grupo destacado “Buffet para
+   Repartir” con LOS MISMOS PRODUCTOS de la Venta Directa (para
+   repartir en eventos). Al editar un producto en el admin, la
+   pestaña Disponibilidad tiene el selector “¿Dónde estará disponible
+   este producto?” con casillas 🛒 Venta Directa y 🍽️ Buffet para
+   Repartir. En BDs existentes la migración marca como buffet a los
+   productos que hoy se ven en Venta Directa (una sola vez, nunca
+   pisa cambios posteriores del admin).
+ - NUEVO (V52.6) La BARRA FLOTANTE MÓVIL ahora es SIEMPRE VISIBLE
+   (antes solo aparecía al final de la página): los clientes pueden
+   saltar de inmediato a Inicio, Venta Directa, Reservas, Servicios,
+   Promos o Galería desde cualquier punto. El MENÚ LATERAL (hamburguesa)
+   también incluye ahora las mismas secciones de la barra flotante,
+   agrupadas bajo “Secciones de la tienda” y con la sección activa
+   resaltada.
+ - NUEVO (V52.5) ⭐ VARIANTES DE SERVICIOS: cada servicio puede tener
+   variantes con FOTO y nombre propios (ej: Muñeco Sorpresa →
+   Payasita, Conejo Chispa, Coneja Maricusa). En el admin un toggle
+   “Servicio con variantes” activa el editor; en la tienda la card
+   muestra el badge “🎭 N variantes”, el modal tiene selector con
+   fotos y el modal de RESERVA deja elegir la variante al añadir el
+   servicio (el ítem de la reserva guarda “Servicio — Variante”).
+ - NUEVO (V52.5) ⭐ COMPRESIÓN DE IMÁGENES EN EL CLIENTE (fix del
+   error 502): las fotos de móvil modernas (8–12 MB) se comprimen
+   automáticamente EN EL NAVEGADOR antes de subir (borde 1600px,
+   WebP ~800KB, calidad adaptativa). Aplica a TODAS las subidas del
+   admin: servicios, variantes, galería, secciones, categorías y
+   productos. El límite del servidor subió a 25MB como red de
+   seguridad y ya NO se rechazan fotos por peso.
+ - NUEVO (V52.5) Precios de Servicios SOLO EN USD en el admin: el
+   peso (CUP) se calcula automáticamente (1 USD = 700 CUP) y la
+   tienda sigue mostrando ambas monedas como siempre.
+ - NUEVO (V52.5) Galería del admin: guía de uso visible, botón
+   “Añadir fotos al carrusel” con progreso “Subiendo 2/5…”, barra
+   de progreso y avisos por foto fallida (sin perder las que sí
+   subieron). El carrusel de cada categoría se llena expandiendo la
+   categoría y subiendo fotos (se comprimen automáticamente).
+ - FIX (V52.5) La notificación de “instalar app móvil” ya NO aparece
+   en PC/portátiles: solo se muestra en teléfonos y tablets.
+ - FOTOS REALES (V52.5): muñecos sorpresa (payasita humana), cañón
+   de confeti sobre pétalos, vela volcánica, pullover sublimado y
+   jarra personalizada con las fotos reales del negocio. En BDs
+   existentes se aplican SOLO si el servicio no tiene foto propia
+   del admin (nunca se pisan tus subidas).
+ - FIX CRÍTICO (V52.4): se reconstruyeron las 5 rutas de subida de
+   imágenes del admin (productos, categorías, galería, secciones y
+   servicios) que se habían PERDIDO del código fuente — el admin
+   vuelve a poder cambiar todas las fotos de la tienda. Convierten a
+   WebP con sharp y espejan en .next/standalone para Railway.
+ - NUEVO (V52.4) “Ver más” en Servicios: se muestran 8 cards y el
+   botón despliega el resto (útil al crecer el catálogo), contador
+   “Mostrando N de M” al filtrar/buscar y botón “Compartir
+   servicio” por WhatsApp en el modal de detalle.
  - Servicios para Eventos: cards VERTICALES con foto protagonista
    real (pullover personalizado, payasita humana, decoración, globos…)
-   + gestión completa desde el admin (crear/editar/ordenar/subir foto)
+   + gestión completa desde el admin (crear/editar/ordenar/subir foto).
+   Filtros por categoría, modal “Ver detalle” con foto grande y
+   botón de consultar por WhatsApp, skeletons de carga y lightbox de
+   la foto a pantalla completa (clic en “Ampliar”).
+   NUEVO (V52.3): buscador de servicios por texto (nombre, descripción
+   o categoría) con botón de limpiar.
  - Promociones v2: card de la promoción (ej: Día de las Madres) con
    las cards de los COMBOS dentro — cada combo se conforma desde el
    admin eligiendo MÁS DE UN producto (suma de precios + descuento).
-   El cliente puede pedir el combo completo de un clic.
+   El cliente puede pedir el combo completo de un clic o compartirlo
+   por WhatsApp. Chip “faltan N días” en el banner de la promo,
+   botón “Compartir” la promoción completa por WhatsApp y lightbox de
+   las fotos de los productos (teclado ←/→/Esc + miniaturas).
+   NUEVO (V52.3): vista previa EN VIVO del combo en el editor del
+   admin (mini-card espejo de la tienda: collage, precios, −%).
+ - NUEVO (V52.3) Centro de Descargas en el Dashboard del admin:
+   versión pendiente, historial de paquetes, botón de descarga y
+   verificación del paquete SIN gastar la versión (dryRun).
+ - NUEVO (V52.3) Botón flotante “volver arriba” en la tienda,
+   scrollbar vertical elegante en listas (carrito, wishlist, admin)
+   y anillos de foco accesibles en botones de cards.
+ - FIX empaquetado: el conversor PNG/JPG→WebP del ZIP volvió a
+   funcionar (IMAGE_EXTENSIONS se había corrompido) y el reescritor
+   de referencias ya no altera literales de código fuente.
+ - /api/download soporta ?dryRun=1 (sondeos sin consumir versión).
  - Galería v2: portadas por categoría + carrusel + lightbox gigante
  - Imágenes de secciones configurables (sembradas en BD + subida admin)
  - Dock de navegación móvil + header compacto

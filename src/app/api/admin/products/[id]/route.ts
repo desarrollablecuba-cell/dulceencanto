@@ -97,6 +97,11 @@ export async function PUT(
     if (data.status !== undefined) data.status = String(data.status);
     if (data.posAvailable !== undefined) data.posAvailable = Boolean(data.posAvailable);
     if (data.tiendaAvailable !== undefined) data.tiendaAvailable = Boolean(data.tiendaAvailable);
+    // V52.6 — canales de venta (Venta Directa / Buffet para Repartir)
+    if (data.directSaleEnabled !== undefined) data.directSaleEnabled = Boolean(data.directSaleEnabled);
+    if (data.buffetEnabled !== undefined) data.buffetEnabled = Boolean(data.buffetEnabled);
+    // V52.8 — precio del buffet por docena en USD
+    if (data.buffetPriceUsd !== undefined) data.buffetPriceUsd = Number(data.buffetPriceUsd) || 30;
     if (data.advanceType !== undefined) data.advanceType = String(data.advanceType);
     if (data.advanceValue !== undefined) data.advanceValue = Number(data.advanceValue);
     if (data.minHours !== undefined) data.minHours = Number(data.minHours);
